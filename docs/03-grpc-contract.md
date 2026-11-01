@@ -20,7 +20,7 @@ autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/
 - Spring: الخادم يتحقق من `Context.current().getDeadline()` قبل بدء الـ transaction ويرفض بـ `DEADLINE_EXCEEDED` إن انتهى؛ و `statement_timeout`/`lock_timeout` في Postgres أقل من أطول مهلة (مثال: `lock_timeout=1500ms`).
 
 ## 3. خريطة الأخطاء
-### في الخادم (Spring — `@GrpcAdvice`)
+### في الخادم (Spring — bean من نوع `GrpcExceptionHandler`؛ لا يوجد `@GrpcAdvice` في Boot 4.1)
 | الحالة | gRPC status |
 |---|---|
 | مدخل غير صالح (ULID خاطئ، كمية خارج 1..1000، بنود مكررة، قائمة فارغة/أكثر من 100، reservation_id/adjustment_id ليس UUID، `reason = RELEASE_REASON_UNSPECIFIED`، `delta = 0` أو \|delta\| > 1,000,000، `note` > 200 حرف) | `INVALID_ARGUMENT` + رسالة تصف الحقل |

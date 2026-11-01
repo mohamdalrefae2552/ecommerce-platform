@@ -72,7 +72,7 @@
 ### P0-INV-01 · هيكل Spring Boot 4.1
 - المالك: spring-engineer · العضو: B · الفرع: `chore/p0-inventory-skeleton` · يعتمد على: P0-LEAD-05
 - النطاق: `backend/inventory/**`.
-- الخطوات: Java 25 toolchain، Gradle Kotlin DSL + version catalog، `spring-boot-starter-grpc-server` + `-test`، JDBC + Flyway + Postgres driver، Actuator (منفذ إدارة داخلي)، protobuf plugin يقرأ `../../contracts/proto`، Spotless (google-java-format)، ErrorProne، JaCoCo بعتبة 85% (مفعّلة لاحقاً حين يوجد كود)، Testcontainers؛ تنفيذ `InventoryService` يعيد `UNIMPLEMENTED` مؤقتاً **فقط في هذه المهمة**؛ gRPC health + reflection؛ graceful shutdown؛ JSON logging + `RequestIdServerInterceptor`؛ Dockerfile متعدد المراحل (JRE 25، غير root، layered jar).
+- الخطوات: Java 25 toolchain، Gradle Kotlin DSL + version catalog، `spring-boot-starter-grpc-server` + `spring-boot-starter-grpc-server-test`، JDBC + Flyway + Postgres driver، Actuator (منفذ إدارة داخلي)، protobuf plugin يقرأ `../../contracts/proto`، Spotless (google-java-format)، ErrorProne، JaCoCo بعتبة 85% (مفعّلة لاحقاً حين يوجد كود)، Testcontainers؛ تنفيذ `InventoryService` يعيد `UNIMPLEMENTED` مؤقتاً **فقط في هذه المهمة**؛ gRPC health + reflection؛ graceful shutdown؛ JSON logging + `RequestIdServerInterceptor`؛ Dockerfile متعدد المراحل (JRE 25، غير root، layered jar).
 - معايير القبول: `make verify-inventory` أخضر؛ `grpcurl -plaintext inventory:9090 list` من `toolbox` يعرض `inventory.v1.InventoryService` و health؛ اختبار يتحقق أن الخادم يقلع مع Testcontainers.
 
 ### P0-WEB-01 · هيكل React

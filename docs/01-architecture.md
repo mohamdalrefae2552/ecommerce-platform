@@ -23,7 +23,7 @@ flowchart LR
 ## 2. خدمات Compose
 | الخدمة | الصورة/البناء | ملاحظات |
 |---|---|---|
-| `edge` | `nginx:1.29-alpine` + `infra/nginx/` | `server_tokens off`، `client_max_body_size 3m`، ترويسات أمان للـ SPA |
+| `edge` | `nginx:1.30.6-alpine` (stable؛ فرع 1.29 انتهى — ADR-0010) + `infra/nginx/` | `server_tokens off`، `client_max_body_size 3m`، ترويسات أمان للـ SPA |
 | `api` | `backend/api/Dockerfile` (php:8.4-fpm + `ext-grpc` + `ext-pdo_pgsql` + `ext-sodium` + opcache) | `expose_php=Off`؛ healthcheck عبر `php-fpm-healthcheck` أو `/api/v1/health` |
 | `scheduler` | نفس صورة `api` | `php artisan schedule:work` (المصالحة كل دقيقة) |
 | `db-app` | `postgres:18-alpine` | volume مستقل |
@@ -76,7 +76,7 @@ backend/api/
 backend/inventory/
 ├── build.gradle.kts            protobuf plugin يقرأ ../../contracts/proto
 ├── src/main/java/com/ecommerce/inventory/
-│   ├── grpc/                   InventoryGrpcService (adapter) · GrpcExceptionAdvice (@GrpcAdvice) · RequestValidator · RequestIdServerInterceptor
+│   ├── grpc/                   InventoryGrpcService (adapter) · InventoryExceptionHandler (`GrpcExceptionHandler` bean) · RequestValidator · RequestIdServerInterceptor
 │   ├── application/            ReservationService · StockQueryService · StockAdjustmentService  (@Transactional هنا فقط)
 │   ├── domain/                 Reservation, ReservationStatus, StockLevel, Shortage, exceptions  (Java records/sealed, بلا Spring)
 │   └── persistence/            StockRepository · ReservationRepository  (JdbcClient + SQL صريح)

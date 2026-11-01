@@ -48,7 +48,7 @@
 
 ### P2-INV-06 · الأخطاء والصلابة والملاحظة
 - العضو: B · الفرع: `feat/r2-inventory-service` · يعتمد على: P2-INV-02..05
-- الخطوات: `@GrpcAdvice` بالخريطة في `docs/03` §3؛ log JSON لكل RPC (`rpc`, `reservation_id`, `outcome`, `duration_ms`, `request_id`) بلا بيانات حساسة؛ Micrometer metrics جاهزة؛ graceful shutdown يكمل الطلبات الجارية؛ JaCoCo ≥ 85%؛ (موصى) PIT على `ReservationService` ≥ 80%.
+- الخطوات: bean `GrpcExceptionHandler` بالخريطة في `docs/03` §3؛ log JSON لكل RPC (`rpc`, `reservation_id`, `outcome`, `duration_ms`, `request_id`) بلا بيانات حساسة؛ Micrometer metrics جاهزة؛ graceful shutdown يكمل الطلبات الجارية؛ JaCoCo ≥ 85%؛ (موصى) PIT على `ReservationService` ≥ 80%.
 - معايير القبول: `make verify-inventory` أخضر؛ استثناء غير متوقع ⇒ `INTERNAL` برسالة عامة والتفاصيل في الـ log فقط (اختبار).
 - **PR:** `feat/r2-inventory-service`.
 
