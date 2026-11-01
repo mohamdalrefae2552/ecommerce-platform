@@ -12,7 +12,8 @@ hook_read_input
 
 desc="$(hook_field '.task_description')"
 subject="$(hook_field '.task_subject')"
-wt="$(printf '%s\n' "$desc" | sed -n 's/^[[:space:]-]*worktree:[[:space:]]*\(\/[^[:space:]]*\).*$/\1/p' | head -n1)"
+# Accepts POSIX (/home/x/wt) and Windows (C:/dev/wt, C:\dev\wt) absolute paths.
+wt="$(printf '%s\n' "$desc" | sed -n -E 's/^[[:space:]-]*worktree:[[:space:]]*((\/|[A-Za-z]:[\\/])[^[:space:]]*).*$/\1/p' | head -n1)"
 [[ -z "$wt" ]] && wt="$(hook_field '.cwd')"
 [[ -z "$wt" || ! -d "$wt" ]] && exit 0
 
