@@ -23,7 +23,7 @@ autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/
 ### في الخادم (Spring — `@GrpcAdvice`)
 | الحالة | gRPC status |
 |---|---|
-| مدخل غير صالح (ULID خاطئ، كمية خارج 1..1000، بنود مكررة، قائمة فارغة/أكثر من 100، reservation_id ليس UUID) | `INVALID_ARGUMENT` + رسالة تصف الحقل |
+| مدخل غير صالح (ULID خاطئ، كمية خارج 1..1000، بنود مكررة، قائمة فارغة/أكثر من 100، reservation_id/adjustment_id ليس UUID، `reason = RELEASE_REASON_UNSPECIFIED`، `delta = 0` أو \|delta\| > 1,000,000، `note` > 200 حرف) | `INVALID_ARGUMENT` + رسالة تصف الحقل |
 | AdjustStock يجعل الكمية سالبة | `FAILED_PRECONDITION` |
 | انتهاء المهلة/إلغاء العميل | `DEADLINE_EXCEEDED` / `CANCELLED` |
 | `lock_timeout` في DB | `ABORTED` (العميل يعامله كـ UNAVAILABLE) |
