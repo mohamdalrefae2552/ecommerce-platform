@@ -54,9 +54,9 @@
 | 405 | `METHOD_NOT_ALLOWED` | |
 | 409 | `INSUFFICIENT_STOCK` | المستودع رفض الحجز (R2-E3) + `shortages` |
 | 409 | `ORDER_INVALID_TRANSITION` | انتقال حالة غير مسموح (مثال: delivered → pending) |
-| 413 | `PAYLOAD_TOO_LARGE` | صورة > 2MB أو جسم > 3MB |
+| 413 | `PAYLOAD_TOO_LARGE` | جسم الطلب > 3MB (يرد به `edge`) |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | |
-| 422 | `VALIDATION_FAILED` | + `errors` |
+| 422 | `VALIDATION_FAILED` | + `errors` (يشمل: صورة > 2MB ⇒ خطأ على `image`، حقل غير معروف في الجسم، ترقيم خارج النطاق) |
 | 422 | `IDEMPOTENCY_KEY_REUSED` | |
 | 429 | `RATE_LIMITED` | + `Retry-After` + `retry_after` |
 | 500 | `INTERNAL_ERROR` | |
@@ -71,7 +71,7 @@
 | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` | ✅ | ✅ | ✅ |
 | `POST /auth/logout` · `GET /auth/me` | 401 | ✅ | ✅ |
 | `GET /categories` · `GET /products` · `GET /products/{id}` | ✅ | ✅ | ✅ |
-| `POST /products` · `PUT /products/{id}/stock` | 401 | 403 | ✅ |
+| `POST /products` · `PUT /products/{id}/stock` (الثاني من المتطلب 2 — P2-LEAD-01) | 401 | 403 | ✅ |
 | `POST /orders` | 401 | ✅ | 403 (المسؤول لا يشتري — قرار تبسيط) |
 | `GET /orders` | 401 | طلباته فقط | كل الطلبات (+ فلتر `status`, `user_id`) |
 | `GET /orders/{id}` | 401 | طلبه ✅ · طلب غيره **404** | ✅ |
@@ -90,16 +90,16 @@
 | POST | `/auth/logout` | — | 204 + حذف الكوكي + إلغاء عائلة التوكن |
 | GET | `/auth/me` | — | 200 `{data: user}` |
 
-قواعد التحقق: `email` RFC + lowercase + فريد؛ `password` ≥ 12 حرفاً + `Password::defaults()->uncompromised()` (اختياري إن لم يتوفر إنترنت في الحاوية — يُقرَّر في P1)؛ `name` 2..100.
+قواعد التحقق: `email` RFC + lowercase + فريد (≤ 254)؛ `password` 12..128 حرفاً (الحد الأعلى يمنع استنزاف argon2 — API4) + `Password::defaults()->uncompromised()` (اختياري إن لم يتوفر إنترنت في الحاوية — يُقرَّر في P1)؛ `name` 2..100.
 
 ### Products
 | Method | Path | ملاحظات | Success |
 |---|---|---|---|
 | GET | `/categories` | قائمة ثابتة مزروعة (seed) | 200 |
-| GET | `/products?category={slug}&page&per_page&q` | `q` بحث بالاسم (اختياري) | 200 قائمة؛ كل عنصر فيه `stock` (انظر أدناه) |
+| GET | `/products?category={slug}&page&per_page&q` | `q` بحث بالاسم (اختياري، 1..100 حرف)؛ `page` 1..100000 | 200 قائمة؛ كل عنصر فيه `stock` (انظر أدناه) |
 | GET | `/products/{id}` | يسأل المستودع (R2-F2) | 200 |
-| POST | `/products` | multipart: `name, description, price_minor, category_id, image` (+ `initial_stock` ابتداءً من المتطلب 2) | 201 |
-| PUT | `/products/{id}/stock` | **(المتطلب 2)** `{delta, note}` + `Idempotency-Key` ⇒ `AdjustStock` | 200 `{data:{product_id, available}}` |
+| POST | `/products` | multipart: `name` (2..120)، `description` (اختياري ≤ 2000)، `price_minor` (1..100,000,000,000)، `category_id`، `image` (+ `initial_stock` ابتداءً من المتطلب 2) | 201 |
+| PUT | `/products/{id}/stock` | **(المتطلب 2 — يُضاف للعقد في P2-LEAD-01)** `{delta, note}` + `Idempotency-Key` ⇒ `AdjustStock` | 200 `{data:{product_id, available}}` |
 
 **تمثيل المخزون في المنتج (graceful degradation — PROOF-R2-2):**
 ```json
@@ -113,9 +113,9 @@
 | Method | Path | Body | Success |
 |---|---|---|---|
 | POST | `/orders` | `{items:[{product_id, quantity}]}` (1..20 بنداً، quantity 1..10، بلا تكرار) + `Idempotency-Key` | 201 |
-| GET | `/orders?status&page&per_page` | | 200 |
-| GET | `/orders/{id}` | | 200 مع `items`, `total`, `status`, `status_history` |
-| PATCH | `/orders/{id}/status` | `{status, note?}` | 200 |
+| GET | `/orders?status&page&per_page` | | 200 — ملخص لكل طلب (`id, user_id, status, total, item_count, created_at, updated_at`) بلا بنود ولا سجل |
+| GET | `/orders/{id}` | | 200 مع `items`, `total`, `status`, `status_history` (كل عنصر: `from, to, actor_role, note, at` — معرّف المنفّذ يُخزَّن ولا يُعرض، API3) |
+| PATCH | `/orders/{id}/status` | `{status, note?}` (`note` ≤ 500) | 200 |
 
 **آلة الحالات (Orders\Domain\OrderStatus):**
 ```

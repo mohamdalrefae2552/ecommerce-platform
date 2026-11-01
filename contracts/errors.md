@@ -55,3 +55,19 @@ Code-specific extensions: `errors` (422 `VALIDATION_FAILED`),
 
 The 409 `INSUFFICIENT_STOCK` and 503 codes are attached to operations in the
 requirement-2 contract update (P2-LEAD-01).
+
+## Errors answered by `edge` (nginx) itself
+
+When the request never reaches Laravel, `edge` still answers with the same
+problem+json shape (never HTML on `/api`):
+
+| HTTP | `code` | When |
+|---|---|---|
+| 404 | `NOT_FOUND` | `/api` without a path |
+| 413 | `PAYLOAD_TOO_LARGE` | body above 3 MB |
+| 502 | `INTERNAL_ERROR` | PHP-FPM unreachable (api container down) |
+| 503 | `INTERNAL_ERROR` | PHP-FPM refused the request |
+| 504 | `INTERNAL_ERROR` | PHP-FPM did not answer within 30 s |
+
+502/503/504 reuse `INTERNAL_ERROR` on purpose: for the client it is an
+unexpected server failure, and the HTTP status already says which kind.

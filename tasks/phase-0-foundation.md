@@ -34,7 +34,8 @@
 - المالك: Lead · العضو: A · الفرع: `chore/p0-contracts` · يعتمد على: P0-LEAD-02
 - النطاق: `contracts/openapi/openapi.yaml` (+ تقسيم اختياري في `paths/`, `components/` مع `$ref`)، `contracts/openapi/redocly.yaml`، `contracts/errors.md`.
 - الخطوات: حوّل `docs/02` حرفياً إلى OpenAPI: كل مسار، كل معامل بحدوده (`minimum/maximum/maxItems/pattern`)، `securitySchemes.bearerAuth` (JWT)، كوكي refresh، كل الردود الممكنة لكل عملية (بما فيها 401/403/404/422/429/503) عبر `components/responses` تشير لـ `Problem` (+ `ValidationProblem`, `InsufficientStockProblem`, `RateLimitedProblem`)، أمثلة واقعية لكل طلب/رد، `operationId` بصيغة camelCase، tags بأسماء الوحدات.
-- معايير القبول: `redocly lint` بلا أخطاء ولا تحذيرات؛ كل endpoint في `docs/02` §4 موجود (قائمة مطابقة في وصف الـ PR)؛ يعرض في Swagger UI دون أخطاء.
+- معايير القبول: `redocly lint` بلا أخطاء ولا تحذيرات؛ كل endpoint في `docs/02` §4 الخاص بالمتطلب 1 موجود (قائمة مطابقة في وصف الـ PR)؛ يعرض في Swagger UI دون أخطاء.
+- **مؤجّل إلى P2-LEAD-01 (إضافة غير كاسرة، phase-1 P1-API-05):** `initial_stock`، `PUT /products/{id}/stock`، ردود 409 `INSUFFICIENT_STOCK` و 503 على `POST /orders`، `InsufficientStockProblem`، `meta.degraded`. الرموز نفسها موجودة في `ProblemCode` منذ الآن.
 
 ### P0-LEAD-05 · PR العقود
 - المالك: Lead · العضو: A (يفتح) / B (يراجع) · الفرع: `chore/p0-contracts` · يعتمد على: P0-LEAD-02..04
