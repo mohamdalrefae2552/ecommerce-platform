@@ -1,8 +1,8 @@
 ---
 name: laravel-module
-description: اتفاقيات كتابة الكود داخل وحدات Laravel (Users, Products, Orders, Notifications) — البنية، Actions، Policies، Resources، الاختبارات، والحدود بين الوحدات. يُستخدم عند إنشاء أو تعديل أي شيء في apps/api.
+description: اتفاقيات كتابة الكود داخل وحدات Laravel (Users, Products, Orders, Notifications) — البنية، Actions، Policies، Resources، الاختبارات، والحدود بين الوحدات. يُستخدم عند إنشاء أو تعديل أي شيء في backend/api.
 paths:
-  - "apps/api/**"
+  - "backend/api/**"
 ---
 
 # العمل داخل وحدة Laravel

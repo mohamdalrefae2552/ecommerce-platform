@@ -18,9 +18,9 @@
 ## 2. التقنيات (مثبّتة الإصدارات — لا تغيّرها دون ADR)
 | المكوّن | التقنية |
 |---|---|
-| التطبيق الأساسي `apps/api` | PHP 8.4 · Laravel 13 · Pest 4 · Larastan · Pint · PostgreSQL 18 |
-| خدمة المخزون `services/inventory` | Java 25 · Spring Boot 4.1 (`spring-boot-starter-grpc-server`) · Gradle (Kotlin DSL) · JdbcClient · Flyway · Testcontainers · PostgreSQL 18 |
-| الواجهة `apps/web` | React 19 · TypeScript (strict) · Vite 8 · TanStack Router + Query · openapi-typescript/openapi-fetch · Zod · Vitest · MSW · Playwright |
+| التطبيق الأساسي `backend/api` | PHP 8.4 · Laravel 13 · Pest 4 · Larastan · Pint · PostgreSQL 18 |
+| خدمة المخزون `backend/inventory` | Java 25 · Spring Boot 4.1 (`spring-boot-starter-grpc-server`) · Gradle (Kotlin DSL) · JdbcClient · Flyway · Testcontainers · PostgreSQL 18 |
+| الواجهة `frontend` | React 19 · TypeScript (strict) · Vite 8 · TanStack Router + Query · openapi-typescript/openapi-fetch · Zod · Vitest · MSW · Playwright |
 | العقود `contracts/` | OpenAPI 3.1 (REST) · Protobuf + buf (gRPC) |
 | التشغيل | Docker Compose · nginx (edge) · Toxiproxy (حقن الأعطال) · Mailpit · k6 |
 
@@ -30,14 +30,14 @@
 ```
 contracts/            ← Lead فقط  (openapi/openapi.yaml, proto/, errors.md)
 docs/  tasks/  CLAUDE.md  compose*.yaml  Makefile  .github/  infra/   ← Lead فقط
-apps/api/             ← laravel-engineer
-services/inventory/   ← spring-engineer
-apps/web/             ← react-engineer
+backend/api/          ← laravel-engineer
+backend/inventory/    ← spring-engineer
+frontend/             ← react-engineer
 tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 ```
 - **لا يعدّل أي وكيل ملفاً خارج نطاقه.** إن احتجت تغييراً خارجه: أرسل رسالة (SendMessage) للمالك أو للـ Lead مع السبب والتعديل المقترح بالضبط.
 - **العقد أولاً:** لا يُكتب endpoint أو RPC غير موجود في العقد. تغيير العقد = طلب للـ Lead ← يطبّق skill `contract-first` ← يُعلم الجميع.
-- الكود المولَّد (`apps/api/generated/`, `apps/web/src/api/schema.d.ts`) لا يُعدّل يدوياً أبداً؛ يُولَّد بـ `make gen`.
+- الكود المولَّد (`backend/api/generated/`, `frontend/src/api/schema.d.ts`) لا يُعدّل يدوياً أبداً؛ يُولَّد بـ `make gen`.
 
 ## 4. القواعد الذهبية (غير قابلة للتفاوض)
 1. **لا تخمين.** أي غموض في المتطلب أو العقد → توقّف واسأل الـ Lead (والـ Lead يسأل الإنسان). لا "حلول مؤقتة" ولا TODO صامت ولا كود demo.

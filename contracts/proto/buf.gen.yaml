@@ -1,18 +1,18 @@
-# PHP client stubs for apps/api (Laravel). Run from contracts/proto by `make gen`
+# PHP client stubs for backend/api (Laravel). Run from contracts/proto by `make gen`
 # inside the `protoc` tools container (infra/protoc/Dockerfile), which provides
 # buf, protoc and grpc_php_plugin.
 #
 # The Spring Boot server does NOT use this file: its Gradle protobuf plugin reads
 # contracts/proto directly and generates into build/ (not committed).
 #
-# Output is committed under apps/api/generated/grpc and CI fails on drift
+# Output is committed under backend/api/generated/grpc and CI fails on drift
 # (`make gen && git diff --exit-code`). Never edit the generated files by hand.
 version: v2
 clean: true
 plugins:
   # Message classes (protoc's built-in PHP generator).
   - protoc_builtin: php
-    out: ../../apps/api/generated/grpc
+    out: ../../backend/api/generated/grpc
   # Client stubs (InventoryServiceClient). Path inside the protoc container.
   - local: grpc_php_plugin
-    out: ../../apps/api/generated/grpc
+    out: ../../backend/api/generated/grpc

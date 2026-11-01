@@ -18,9 +18,9 @@ block() {
 }
 
 case "$path" in
-  */apps/api/generated/*|apps/api/generated/*)
+  */backend/api/generated/*|backend/api/generated/*)
     block "generated gRPC stubs are never edited by hand. Change contracts/proto (Lead only) and run 'make gen'." ;;
-  */apps/web/src/api/schema.d.ts|apps/web/src/api/schema.d.ts)
+  */frontend/src/api/schema.d.ts|frontend/src/api/schema.d.ts)
     block "schema.d.ts is generated from contracts/openapi. Ask the Lead for a contract change, then 'make gen'." ;;
   */storage/keys/*|storage/keys/*)
     block "JWT keys are generated at runtime by 'php artisan jwt:keys' and must never be written by an agent." ;;

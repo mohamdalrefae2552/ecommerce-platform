@@ -8,11 +8,11 @@
 flowchart TB
   H[العضو المناوب A أو B] <--> L[Lead<br/>الجلسة الرئيسية]
   subgraph BE[فريق Backend]
-    LE[laravel-engineer<br/>apps/api]
-    SE[spring-engineer<br/>services/inventory]
+    LE[laravel-engineer<br/>backend/api]
+    SE[spring-engineer<br/>backend/inventory]
   end
   subgraph FQ[فريق Frontend & Quality]
-    RE[react-engineer<br/>apps/web]
+    RE[react-engineer<br/>frontend]
     QA[qa-security-engineer<br/>tests/*]
   end
   L --> LE & SE & RE & QA
@@ -26,9 +26,9 @@ flowchart TB
 | الوكيل | يملك | لا يلمس | يتواصل مع |
 |---|---|---|---|
 | Lead | `contracts/` `docs/` `tasks/` `infra/` `compose*.yaml` `Makefile` `.github/` `CLAUDE.md` | كود المكوّنات | الكل + الإنسان |
-| laravel-engineer | `apps/api/**` (عدا `generated/`) | العقود | spring (دلالات gRPC)، react (سلوك API) |
-| spring-engineer | `services/inventory/**` | العقود | laravel |
-| react-engineer | `apps/web/**` (عدا `src/api/schema.d.ts`) | العقود | laravel |
+| laravel-engineer | `backend/api/**` (عدا `generated/`) | العقود | spring (دلالات gRPC)، react (سلوك API) |
+| spring-engineer | `backend/inventory/**` | العقود | laravel |
+| react-engineer | `frontend/**` (عدا `src/api/schema.d.ts`) | العقود | laravel |
 | qa-security-engineer | `tests/e2e/` `tests/load/` `tests/security/` | كود الإنتاج (يبلّغ عن العيوب فقط) | الكل |
 | code-reviewer (subagent) | — قراءة فقط | كل شيء | Lead |
 

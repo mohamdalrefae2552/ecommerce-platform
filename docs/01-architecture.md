@@ -24,10 +24,10 @@ flowchart LR
 | الخدمة | الصورة/البناء | ملاحظات |
 |---|---|---|
 | `edge` | `nginx:1.29-alpine` + `infra/nginx/` | `server_tokens off`، `client_max_body_size 3m`، ترويسات أمان للـ SPA |
-| `api` | `apps/api/Dockerfile` (php:8.4-fpm + `ext-grpc` + `ext-pdo_pgsql` + `ext-sodium` + opcache) | `expose_php=Off`؛ healthcheck عبر `php-fpm-healthcheck` أو `/api/v1/health` |
+| `api` | `backend/api/Dockerfile` (php:8.4-fpm + `ext-grpc` + `ext-pdo_pgsql` + `ext-sodium` + opcache) | `expose_php=Off`؛ healthcheck عبر `php-fpm-healthcheck` أو `/api/v1/health` |
 | `scheduler` | نفس صورة `api` | `php artisan schedule:work` (المصالحة كل دقيقة) |
 | `db-app` | `postgres:18-alpine` | volume مستقل |
-| `inventory` | `services/inventory/Dockerfile` (multi-stage، JRE 25، مستخدم غير root) | gRPC health + reflection؛ actuator على منفذ داخلي |
+| `inventory` | `backend/inventory/Dockerfile` (multi-stage، JRE 25، مستخدم غير root) | gRPC health + reflection؛ actuator على منفذ داخلي |
 | `db-inventory` | `postgres:18-alpine` | volume مستقل، **لا يصل إليها `api` شبكياً** (شبكة `inventory-net` منفصلة) |
 | `toxiproxy` | `ghcr.io/shopify/toxiproxy` | proxy `inventory` : `0.0.0.0:50051 → inventory:9090` |
 | `swagger` | `swaggerapi/swagger-ui` | يقرأ `contracts/openapi/openapi.yaml` |
@@ -44,7 +44,7 @@ flowchart LR
 
 ## 3. التطبيق الأساسي — Modular Monolith (Laravel)
 ```
-apps/api/
+backend/api/
 ├── app/
 │   ├── Modules/
 │   │   ├── Users/          Http/{Controllers,Requests,Resources} · Models · Actions · Policies · Contracts · Database/{Migrations,Factories,Seeders} · Providers/UsersServiceProvider.php · routes.php
@@ -73,7 +73,7 @@ apps/api/
 
 ## 4. خدمة المخزون — Hexagonal (Spring Boot)
 ```
-services/inventory/
+backend/inventory/
 ├── build.gradle.kts            protobuf plugin يقرأ ../../contracts/proto
 ├── src/main/java/com/ecommerce/inventory/
 │   ├── grpc/                   InventoryGrpcService (adapter) · GrpcExceptionAdvice (@GrpcAdvice) · RequestValidator · RequestIdServerInterceptor
@@ -89,7 +89,7 @@ services/inventory/
 
 ## 5. الواجهة (React)
 ```
-apps/web/src/
+frontend/src/
 ├── api/        schema.d.ts (مولَّد) · client.ts (openapi-fetch + auth middleware + single-flight refresh) · problem.ts
 ├── auth/       AuthProvider (access token في الذاكرة فقط) · guards
 ├── features/   products/ · cart/ · orders/ · admin/ · notifications/

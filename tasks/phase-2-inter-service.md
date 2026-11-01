@@ -57,7 +57,7 @@
 
 ### P2-API-01 · توليد stubs والـ Gateway
 - العضو: A · الفرع: `feat/r2-inventory-gateway` · يعتمد على: P2-LEAD-01
-- النطاق: `apps/api/generated/grpc/**` (عبر `make gen` فقط)، `app/Shared/Inventory/**`, `config/inventory.php`.
+- النطاق: `backend/api/generated/grpc/**` (عبر `make gen` فقط)، `app/Shared/Inventory/**`, `config/inventory.php`.
 - الخطوات: `InventoryGateway` interface بأساليب نطاق (`stockFor(array $ids): StockLevels`, `reserve(ReservationId, Items): ReservationResult`, `release(ReservationId, ReleaseReason): ReleaseResult`, `adjust(...)`)؛ `GrpcInventoryGateway`: قناة واحدة لكل عملية FPM (lazy singleton)، deadline إلزامي لكل نداء، metadata `x-request-id`، إعادة محاولة Reserve وفق `docs/03` §2 فقط، تحويل الحالات وفق `docs/03` §3، التحقق من الردود (§4)؛ `FakeInventoryGateway` للاختبارات (قابل للبرمجة: نجاح/نقص/مهلة/عطل)؛ ربط في الحاوية حسب `config`.
 - معايير القبول: `GrpcInventoryGatewayTest` بعميل stub مزيف لكل رمز gRPC ⇒ الاستثناء الصحيح؛ لا نداء بلا `timeout` (اختبار يفحص الخيارات الممررة)؛ رد مخالف (reservation_id مختلف) ⇒ `InventoryContractViolation`؛ فحص انحراف المولَّد في CI.
 

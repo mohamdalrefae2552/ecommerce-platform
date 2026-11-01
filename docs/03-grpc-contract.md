@@ -6,7 +6,7 @@
 | الطرف | الآلية | المخرج |
 |---|---|---|
 | Spring (خادم) | Gradle `com.google.protobuf` plugin، `sourceSets.main.proto.srcDir("../../contracts/proto")` — Spring Boot 4.1 يضبط `protoc` وإصداره تلقائياً | `build/generated/…` (غير مُلتزَم) |
-| Laravel (عميل) | `make gen` ← حاوية `protoc` (`protoc` + `grpc_php_plugin`) | `apps/api/generated/grpc/` (مُلتزَم + فحص انحراف `git diff --exit-code` في CI) |
+| Laravel (عميل) | `make gen` ← حاوية `protoc` (`protoc` + `grpc_php_plugin`) | `backend/api/generated/grpc/` (مُلتزَم + فحص انحراف `git diff --exit-code` في CI) |
 autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/"` و `GPBMetadata` بالمثل.
 
 ## 2. المهل (Deadlines) — R2-E2

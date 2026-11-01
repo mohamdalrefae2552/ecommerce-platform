@@ -1,4 +1,4 @@
-# services/inventory — Spring Boot 4.1 / Java 25 (المالك: spring-engineer)
+# backend/inventory — Spring Boot 4.1 / Java 25 (المالك: spring-engineer)
 
 ## المسؤولية
 **كل إدارة المخزون:** معرفة الكمية (GetStock)، الحجز الذري (ReserveStock)، الإرجاع (ReleaseStock)، تعديل المسؤول (AdjustStock). قاعدة `db-inventory` ملك هذه الخدمة وحدها. الاتصال الوحيد: gRPC على 9090 داخل `inventory-net`.

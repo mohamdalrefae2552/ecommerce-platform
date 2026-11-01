@@ -1,4 +1,4 @@
-# apps/api — Laravel 13 (المالك: laravel-engineer)
+# backend/api — Laravel 13 (المالك: laravel-engineer)
 
 ## المسؤولية
 المستخدمون · المنتجات (بلا كميات) · الطلبات · الإشعارات · واجهة REST v1 · المصادقة والأمان.

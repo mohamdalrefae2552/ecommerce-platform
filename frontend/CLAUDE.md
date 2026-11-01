@@ -1,4 +1,4 @@
-# apps/web — React 19 + TypeScript (المالك: react-engineer)
+# frontend — React 19 + TypeScript (المالك: react-engineer)
 
 ## المسؤولية
 واجهة عربية (RTL) لكل الوظائف الخمس + عرض الإثباتات بوضوح (رسائل الرفض، توقف المستودع، نقص الكمية). التصميم لا يُقيَّم.
