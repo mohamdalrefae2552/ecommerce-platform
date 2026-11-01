@@ -7,7 +7,7 @@
 - **الإصدار في المسار:** كل المسارات تحت `/api/v1`. إصدار جديد = مسار جديد، لا كسر لـ v1.
 - **JSON فقط:** الطلبات `application/json` (عدا رفع الصورة `multipart/form-data`). أي `Accept` آخر لا يغيّر الصيغة. Middleware `ForceJson`.
 - **أسماء الحقول:** `snake_case`. التواريخ ISO-8601 UTC (`2026-11-01T17:41:00Z`). المعرّفات ULID نصية.
-- **المال:** `{ "amount_minor": 125000, "currency": "USD" }` — لا أعداد عشرية للمال أبداً.
+- **المال:** `{ "amount_minor": 450000000, "currency": "SYP" }` — عدد صحيح بالوحدة الصغرى (1 ل.س = 100 قرش، ISO 4217) — لا أعداد عشرية للمال أبداً. العملة الوحيدة: **الليرة السورية `SYP`** (قرار الإنسان في P0).
 - **الترقيم (R1-A6):** `?page=1&per_page=20` (`per_page` من 1 إلى 100، الافتراضي 20). القيم خارج النطاق ⇒ 422 (لا قصّ صامت).
 - **غلاف القوائم:**
   ```json
@@ -133,7 +133,7 @@ pending ──► confirmed ──► shipped ──► delivered
 الإشعارات المولّدة: `order.placed` (للزبون)، `order.status_changed` (للزبون). القنوات: database + mail (Mailpit).
 
 ### Health
-`GET /api/v1/health` ⇒ 200 `{status:"ok", checks:{db:"ok", inventory:"ok|degraded"}}` — بلا معلومات حساسة.
+`GET /api/v1/health` ⇒ 200 `{status:"ok", checks:{db:"ok", inventory:"ok|degraded"}}` — بلا معلومات حساسة. إن لم تُجب قاعدة البيانات ⇒ 500 problem+json.
 
 ## 5. التوثيق القابل للتجربة (R1-A4)
 - `swagger` على `http://localhost:8080/docs` يقرأ `openapi.yaml` مع **Try it out** يعمل (نفس الأصل ⇒ لا CORS).

@@ -68,7 +68,7 @@ backend/api/
 ### نمط الكود داخل الوحدة
 - Controller رفيع: يتحقق (FormRequest) ← يفوّض (Policy) ← ينفّذ Action ← يعيد Resource.
 - Action = حالة استخدام واحدة، قابلة للاختبار دون HTTP (`CreateOrder`, `ChangeOrderStatus`, `RegisterUser`…).
-- المعرّفات ULID (`HasUlids`). المال: عدد صحيح بالوحدة الصغرى (`price_minor`) + `currency` ثابتة `SYP`/`USD` (قرار في P0).
+- المعرّفات ULID (`HasUlids`). المال: عدد صحيح بالوحدة الصغرى (`price_minor`) + `currency` ثابتة `SYP` (قرار الإنسان في P0).
 - لا Eloquent خارج وحدته. لا `Model::unguard()`. `$fillable` صريح.
 
 ## 4. خدمة المخزون — Hexagonal (Spring Boot)
