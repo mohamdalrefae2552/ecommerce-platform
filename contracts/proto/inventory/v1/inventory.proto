@@ -1,0 +1,160 @@
+// =============================================================================
+// Inventory Service — gRPC contract (Source of Truth)
+// -----------------------------------------------------------------------------
+// المالك: Team Lead فقط. أي تعديل يمر عبر skill `contract-first`:
+//   buf lint → buf breaking (ضد main) → make gen → إشعار الفريقين.
+//
+// القواعد الدلالية (Semantics) — ملزمة للطرفين، وتفاصيلها في
+// docs/03-grpc-contract.md و docs/05-inventory-consistency.md:
+//
+//  1. ReserveStock ذرّي: إمّا أن تُحجز كل البنود أو لا شيء (All-or-nothing).
+//  2. ReserveStock و ReleaseStock و AdjustStock كلها Idempotent عبر معرّف
+//     يولّده المستدعي (reservation_id / adjustment_id).
+//  3. نقص الكمية نتيجة عمل (business outcome) وليس خطأ: يعود OK مع
+//     outcome = INSUFFICIENT_STOCK. رموز gRPC غير OK مخصصة للأعطال فقط.
+//  4. ReleaseStock لمعرّف غير موجود يكتب "شاهد قبر" (tombstone) بحالة RELEASED،
+//     فأي ReserveStock متأخر بنفس المعرّف يعود RESERVATION_ALREADY_RELEASED ولا
+//     يحجز شيئاً. هذا يغلق سباق (Timeout → Release يسبق Reserve البطيء).
+//  5. كل نداء يحمل Deadline من المستدعي، والخادم يحترمه (لا عمل بعد انتهائه).
+//  6. Metadata: يمرّر المستدعي `x-request-id` لتتبع الطلب عبر الخدمتين.
+// =============================================================================
+syntax = "proto3";
+
+package inventory.v1;
+
+option java_multiple_files = true;
+option java_outer_classname = "InventoryProto";
+option java_package = "com.ecommerce.inventory.grpc.v1";
+option php_metadata_namespace = "Ecommerce\\Inventory\\V1\\GPBMetadata";
+option php_namespace = "Ecommerce\\Inventory\\V1";
+
+// InventoryService هي الواجهة الوحيدة لبيانات المخزون. التطبيق الأساسي لا يقرأ
+// قاعدة بيانات المستودع أبداً.
+service InventoryService {
+  // GetStock — "كم بقي من هذا المنتج؟" (دفعي Batch لتفادي N+1 في القوائم).
+  // منتج غير معروف للمستودع يعود available = 0 و tracked = false.
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+
+  // ReserveStock — "احجز كميات منتجات الطلب" في نداء واحد وبشكل ذرّي.
+  rpc ReserveStock(ReserveStockRequest) returns (ReserveStockResponse);
+
+  // ReleaseStock — "أعد ما حُجز إذا فشل الطلب" (أو أُلغي). Idempotent.
+  rpc ReleaseStock(ReleaseStockRequest) returns (ReleaseStockResponse);
+
+  // AdjustStock — عملية إدارية (إضافة/خصم كمية من المسؤول). ليست ضمن العمليات
+  // الثلاث المطلوبة في العرض، أُضيفت لأن "إدارة المخزون" وظيفة إلزامية ولا
+  // يجوز للتطبيق لمس قاعدة المستودع مباشرة. (D-01 محسوم: إدارة المخزون كلها في Spring Boot)
+  rpc AdjustStock(AdjustStockRequest) returns (AdjustStockResponse);
+}
+
+// ----------------------------------------------------------------- GetStock --
+
+message GetStockRequest {
+  // ULIDs (26 حرفاً). 1..100 عنصر، بلا تكرار. خلاف ذلك → INVALID_ARGUMENT.
+  repeated string product_ids = 1;
+}
+
+message StockLevel {
+  string product_id = 1;
+  // الكمية المتاحة للحجز الآن (لا تشمل المحجوز).
+  int64 available = 2;
+  // false إن لم يُسجَّل المنتج في المستودع بعد.
+  bool tracked = 3;
+}
+
+message GetStockResponse {
+  // عنصر واحد لكل product_id مطلوب، بنفس الترتيب.
+  repeated StockLevel levels = 1;
+}
+
+// ------------------------------------------------------------- ReserveStock --
+
+message ReservationItem {
+  string product_id = 1;
+  // 1..1000. البنود المكررة لنفس المنتج تُرفض بـ INVALID_ARGUMENT.
+  int32 quantity = 2;
+}
+
+message ReserveStockRequest {
+  // UUID يولّده المستدعي لكل محاولة إنشاء طلب. مفتاح الـ Idempotency.
+  string reservation_id = 1;
+  // 1..100 بند.
+  repeated ReservationItem items = 2;
+}
+
+enum ReserveOutcome {
+  RESERVE_OUTCOME_UNSPECIFIED = 0;
+  // حُجزت كل البنود (أو كان الحجز موجوداً مسبقاً بنفس المعرّف — إعادة آمنة).
+  RESERVE_OUTCOME_RESERVED = 1;
+  // بند واحد على الأقل كميته غير كافية. لم يُحجز أي شيء. التفاصيل في shortages.
+  RESERVE_OUTCOME_INSUFFICIENT_STOCK = 2;
+  // المعرّف سبق أن أُفرج عنه (tombstone). لم يُحجز أي شيء.
+  RESERVE_OUTCOME_RESERVATION_ALREADY_RELEASED = 3;
+}
+
+message Shortage {
+  string product_id = 1;
+  int32 requested = 2;
+  int64 available = 3;
+}
+
+message ReserveStockResponse {
+  string reservation_id = 1;
+  ReserveOutcome outcome = 2;
+  // غير فارغة فقط عند INSUFFICIENT_STOCK، مرتبة حسب product_id.
+  repeated Shortage shortages = 3;
+}
+
+// ------------------------------------------------------------- ReleaseStock --
+
+enum ReleaseReason {
+  RELEASE_REASON_UNSPECIFIED = 0;
+  // فشل حفظ الطلب بعد نجاح الحجز.
+  RELEASE_REASON_ORDER_PERSISTENCE_FAILED = 1;
+  // نتيجة الحجز مجهولة (Timeout/Unavailable) → تعويض احترازي.
+  RELEASE_REASON_RESERVE_OUTCOME_UNKNOWN = 2;
+  // أُلغي الطلب من المسؤول.
+  RELEASE_REASON_ORDER_CANCELLED = 3;
+  // أداة المصالحة (reconciler) وجدت حجزاً يتيماً.
+  RELEASE_REASON_RECONCILIATION = 4;
+}
+
+message ReleaseStockRequest {
+  string reservation_id = 1;
+  ReleaseReason reason = 2;
+}
+
+enum ReleaseOutcome {
+  RELEASE_OUTCOME_UNSPECIFIED = 0;
+  // كان محجوزاً وأُعيدت الكميات الآن.
+  RELEASE_OUTCOME_RELEASED = 1;
+  // كان مُفرجاً عنه مسبقاً — لا شيء تغيّر (Idempotent).
+  RELEASE_OUTCOME_ALREADY_RELEASED = 2;
+  // لم يكن موجوداً؛ كُتب tombstone لمنع أي حجز متأخر بنفس المعرّف.
+  RELEASE_OUTCOME_NOT_FOUND_TOMBSTONED = 3;
+}
+
+message ReleaseStockResponse {
+  string reservation_id = 1;
+  ReleaseOutcome outcome = 2;
+}
+
+// -------------------------------------------------------------- AdjustStock --
+
+message AdjustStockRequest {
+  // UUID لكل عملية تعديل (Idempotency).
+  string adjustment_id = 1;
+  string product_id = 2;
+  // موجب = توريد، سالب = خصم (تالف/جرد). لا يساوي صفراً. |delta| ≤ 1,000,000.
+  int64 delta = 3;
+  // نص حر قصير للتدقيق (≤ 200 حرف).
+  string note = 4;
+}
+
+message AdjustStockResponse {
+  string adjustment_id = 1;
+  string product_id = 2;
+  // الكمية المتاحة بعد التعديل.
+  int64 available = 3;
+}
+// خصم يجعل الكمية سالبة → FAILED_PRECONDITION (هذا خطأ استدعاء إداري، لا نتيجة عمل).
