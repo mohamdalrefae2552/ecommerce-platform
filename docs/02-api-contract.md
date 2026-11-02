@@ -52,7 +52,7 @@
 | 403 | `FORBIDDEN` | الدور لا يسمح بالعملية (مثال: زبون يغيّر حالة طلب) |
 | 404 | `NOT_FOUND` | مورد غير موجود **أو** ليس للمستخدم حق رؤيته (D-02) |
 | 405 | `METHOD_NOT_ALLOWED` | |
-| 409 | `INSUFFICIENT_STOCK` | المستودع رفض الحجز (R2-E3) + `shortages` |
+| 409 | `INSUFFICIENT_STOCK` | المستودع رفض الحجز (R2-E3)، أو خصم مخزون أكبر من المتاح في `PUT /products/{id}/stock` + `shortages` |
 | 409 | `ORDER_INVALID_TRANSITION` | انتقال حالة غير مسموح (مثال: delivered → pending) |
 | 413 | `PAYLOAD_TOO_LARGE` | جسم الطلب > 3MB (يرد به `edge`) |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | |
@@ -71,7 +71,7 @@
 | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` | ✅ | ✅ | ✅ |
 | `POST /auth/logout` · `GET /auth/me` | 401 | ✅ | ✅ |
 | `GET /categories` · `GET /products` · `GET /products/{id}` | ✅ | ✅ | ✅ |
-| `POST /products` · `PUT /products/{id}/stock` (الثاني من المتطلب 2 — P2-LEAD-01) | 401 | 403 | ✅ |
+| `POST /products` · `PUT /products/{id}/stock` | 401 | 403 | ✅ |
 | `POST /orders` | 401 | ✅ | 403 (المسؤول لا يشتري — قرار تبسيط) |
 | `GET /orders` | 401 | طلباته فقط | كل الطلبات (+ فلتر `status`, `user_id`) |
 | `GET /orders/{id}` | 401 | طلبه ✅ · طلب غيره **404** | ✅ |
@@ -99,7 +99,7 @@
 | GET | `/products?category={slug}&page&per_page&q` | `q` بحث بالاسم (اختياري، 1..100 حرف)؛ `page` 1..100000 | 200 قائمة؛ كل عنصر فيه `stock` (انظر أدناه) |
 | GET | `/products/{id}` | يسأل المستودع (R2-F2) | 200 |
 | POST | `/products` | multipart: `name` (2..120)، `description` (اختياري ≤ 2000)، `price_minor` (1..100,000,000,000)، `category_id`، `image` (+ `initial_stock` ابتداءً من المتطلب 2) | 201 |
-| PUT | `/products/{id}/stock` | **(المتطلب 2 — يُضاف للعقد في P2-LEAD-01)** `{delta, note}` + `Idempotency-Key` ⇒ `AdjustStock` | 200 `{data:{product_id, available}}` |
+| PUT | `/products/{id}/stock` | **(المتطلب 2)** `{delta, note?}` (`delta` ≠ 0، \|delta\| ≤ 1,000,000، `note` ≤ 200) + `Idempotency-Key` **إلزامي** ⇒ `AdjustStock`. خصم أكبر من المتاح ⇒ 409 `INSUFFICIENT_STOCK` (+ `shortages`)؛ المستودع متوقف ⇒ 503 | 200 `{data:{product_id, available}}` |
 
 **تمثيل المخزون في المنتج (graceful degradation — PROOF-R2-2):**
 ```json

@@ -38,6 +38,7 @@ autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/
 | OK + RESERVATION_ALREADY_RELEASED | `ReservationAborted` | 503 `INVENTORY_TIMEOUT` (لا يحدث إلا بعد مهلة سابقة) |
 | `DEADLINE_EXCEEDED` | `InventoryTimeout` | 503 `INVENTORY_TIMEOUT` + `Retry-After: 5` |
 | `UNAVAILABLE`, `ABORTED`, `RESOURCE_EXHAUSTED` | `InventoryUnavailable` | 503 `INVENTORY_UNAVAILABLE` + `Retry-After: 5` |
+| `FAILED_PRECONDITION` (AdjustStock فقط) | `StockWouldBeNegative(available)` | 409 `INSUFFICIENT_STOCK` + `shortages` (`requested` = الكمية المطلوب خصمها) |
 | `INVALID_ARGUMENT`, `INTERNAL`, غيرها | `InventoryContractViolation` (يُسجَّل error) | 500 `INTERNAL_ERROR` |
 **قاعدة:** أي نتيجة غير مؤكدة لـ ReserveStock (Timeout/Unavailable/Aborted) ⇒ تعويض فوري `ReleaseStock(RESERVE_OUTCOME_UNKNOWN)`.
 

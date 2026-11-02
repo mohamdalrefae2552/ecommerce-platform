@@ -28,7 +28,7 @@ and 500 — is `Content-Type: application/problem+json` with this shape
 
 Code-specific extensions: `errors` (422 `VALIDATION_FAILED`),
 `retry_after` (429, and 503 from requirement 2), `shortages` (409
-`INSUFFICIENT_STOCK`, requirement 2).
+`INSUFFICIENT_STOCK`).
 
 ## Catalog
 
@@ -42,7 +42,7 @@ Code-specific extensions: `errors` (422 `VALIDATION_FAILED`),
 | 403 | `FORBIDDEN` | `forbidden` | Role may not perform the operation (e.g. customer changes order status); refresh CSRF guard failed | — |
 | 404 | `NOT_FOUND` | `not-found` | Resource or route does not exist, **or** the caller may not see it (D-02) | — |
 | 405 | `METHOD_NOT_ALLOWED` | `method-not-allowed` | HTTP method not supported on the route | `Allow` |
-| 409 | `INSUFFICIENT_STOCK` | `insufficient-stock` | Inventory rejected the reservation (R2-E3) | `shortages` |
+| 409 | `INSUFFICIENT_STOCK` | `insufficient-stock` | Inventory rejected the reservation (R2-E3), or a stock write-off is larger than the available quantity | `shortages` |
 | 409 | `ORDER_INVALID_TRANSITION` | `order-invalid-transition` | Status transition not allowed (e.g. `delivered → pending`) | — |
 | 413 | `PAYLOAD_TOO_LARGE` | `payload-too-large` | Body above 3 MB (answered by `edge`) | — |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | `unsupported-media-type` | `Content-Type` not accepted by the operation | — |
@@ -53,8 +53,11 @@ Code-specific extensions: `errors` (422 `VALIDATION_FAILED`),
 | 503 | `INVENTORY_UNAVAILABLE` | `inventory-unavailable` | Inventory down (gRPC `UNAVAILABLE`/`ABORTED`/`RESOURCE_EXHAUSTED`) | `Retry-After: 5`, `retry_after` |
 | 503 | `INVENTORY_TIMEOUT` | `inventory-timeout` | Inventory deadline exceeded | `Retry-After: 5`, `retry_after` |
 
-The 409 `INSUFFICIENT_STOCK` and 503 codes are attached to operations in the
-requirement-2 contract update (P2-LEAD-01).
+Where the requirement-2 codes appear: `POST /orders` (409 `INSUFFICIENT_STOCK`,
+503 `INVENTORY_UNAVAILABLE` / `INVENTORY_TIMEOUT`) and
+`PUT /products/{productId}/stock` (the same three). Product reads never fail
+because of the inventory: they degrade to `stock.status = unknown` and lists
+report `meta.degraded: ["inventory"]`.
 
 ## Errors answered by `edge` (nginx) itself
 
