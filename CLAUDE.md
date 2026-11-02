@@ -62,7 +62,7 @@ tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 | `make race-test` | إثبات الـ Race Condition (k6: طلبات متزامنة على آخر قطعة) |
 | `make chaos-latency MS=3000` / `make chaos-down` / `make chaos-reset` | حقن بطء/توقف بين التطبيق والمستودع |
 | `make demo-r1` / `make demo-r2` | سيناريوهات المقابلة |
-| `make wt NAME=api BRANCH=feat/r1-auth-jwt` / `make wt-rm NAME=api` | إنشاء/حذف git worktree لوكيل |
+| `make wt NAME=x BRANCH=…` / `make wt-rm NAME=x` | worktree منفصل لتجربة معزولة فقط (ليس سير العمل الافتراضي — ADR-0012) |
 | `make fmt-file FILE=<abs path>` | تنسيق ملف واحد (يستدعيه hook تلقائياً بعد كل تعديل؛ يطبع `FMT_INVALID:` إن كان الملف غير صالح) |
 
 الأوامر تعمل داخل الحاويات؛ لا يلزم PHP/Java/Node على الجهاز (Node مطلوب فقط لـ Claude Code نفسه).
@@ -80,8 +80,8 @@ tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 - **فريق Backend:** `laravel-engineer` + `spring-engineer`.
 - **فريق Frontend & Quality:** `react-engineer` + `qa-security-engineer`.
 - مراجع مستقل: subagent `code-reviewer` (قراءة فقط) يُستدعى قبل كل PR.
-- كل عضو يعمل في **worktree خاص به** (مسار مطلق يعطيه الـ Lead في رسالة الإطلاق) وعلى فرع المهمة. لا يعمل أي وكيل في مجلد غيره.
-- بروتوكول التواصل وتفاصيل الـ worktrees: `docs/07-team-and-git-workflow.md`.
+- **كل الوكلاء يعملون في مجلد المشروع نفسه** (`C:\dev\ecommerce-platform`) وعلى فرع الدفعة الحالي (ADR-0012). كل وكيل يعدّل مجلد نطاقه فقط، ويُضيف للـ commit ملفات نطاقه فقط (`git add <مجلدك>` — ممنوع `git add -A` / `git add .` / `commit -a`).
+- بروتوكول التواصل والفروع: `docs/07-team-and-git-workflow.md`.
 
 ## 8. قرارات مفتوحة تحتاج تأكيد الإنسان (لا تتجاوزها)
 | # | القرار | الافتراض الحالي |

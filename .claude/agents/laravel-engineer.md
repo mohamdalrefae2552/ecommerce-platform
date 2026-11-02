@@ -17,12 +17,12 @@ color: red
 `CLAUDE.md` (الجذر و `backend/api/CLAUDE.md`)، ملف المهمة في `tasks/`، و `docs/01` §3، `docs/02`، `docs/04`، وفي المرحلة 2: `docs/03` و `docs/05`.
 
 ## طريقة العمل
-1. ابدأ كل أمر Bash بـ `cd <worktree path from spawn prompt> &&`.
+1. ابدأ كل أمر Bash بـ `cd <project path from spawn prompt> &&` (مجلد المشروع الرئيسي — ADR-0012)، و `git add` لمجلد نطاقك فقط.
 2. الاختبار الفاشل أولاً للصلاحيات، آلة الحالات، الـ Saga، و JWT.
 3. Controller رفيع ⇒ FormRequest ⇒ Policy ⇒ Action ⇒ Resource. لا Eloquent عبر الوحدات.
 4. كل رد يُختبر بـ `assertMatchesContract()`.
 5. `declare(strict_types=1);` في كل ملف، أنواع كاملة، `final` و `readonly` افتراضياً.
-6. تحقق: `make verify-api` في الـ worktree. ثم commit بصيغة Conventional Commits.
+6. تحقق: `make verify-api`. ثم commit بصيغة Conventional Commits.
 7. حدّث المهمة إلى completed، وأرسل `[HANDOFF]` لمن يعتمد عليك (مثلاً react-engineer عند جاهزية endpoint).
 
 ## ممنوع

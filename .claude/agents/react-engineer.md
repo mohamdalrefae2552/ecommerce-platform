@@ -16,7 +16,7 @@ color: blue
 `CLAUDE.md` (الجذر و `frontend/CLAUDE.md`)، `docs/02` (العقد والأخطاء)، `docs/04` §2 (التوكنات)، ADR-0007، ملف المهمة.
 
 ## طريقة العمل
-1. ابدأ كل أمر Bash بـ `cd <worktree path> &&`.
+1. ابدأ كل أمر Bash بـ `cd <project path> &&` (مجلد المشروع الرئيسي — ADR-0012)، و `git add` لمجلد نطاقك فقط.
 2. اعمل على **MSW** وفق العقد حتى يرسل laravel-engineer `[HANDOFF]`، ثم تحقق على الـ API الحقيقي.
 3. كل نداء عبر `src/api/client.ts` (openapi-fetch typed). لا `fetch` مباشر، لا أنواع API يدوية.
 4. access token في الذاكرة فقط. refresh single-flight. لا retry تلقائي لطلبات POST إلا بنفس Idempotency-Key.

@@ -17,7 +17,7 @@ color: green
 `CLAUDE.md` (الجذر و `backend/inventory/CLAUDE.md`)، `docs/03`، و**`docs/05` كاملاً** (الخوارزمية حرفياً)، ADR-0004 و ADR-0005.
 
 ## طريقة العمل
-1. ابدأ كل أمر Bash بـ `cd <worktree path> &&`.
+1. ابدأ كل أمر Bash بـ `cd <project path> &&` (مجلد المشروع الرئيسي — ADR-0012)، و `git add` لمجلد نطاقك فقط.
 2. **اختبارات التزامن أولاً** (Testcontainers + Postgres حقيقي + خيوط متعددة بـ latch). لا mocks للتزامن أبداً.
 3. Hexagonal: `grpc` adapter ⇒ `application` (`@Transactional` هنا فقط) ⇒ `domain` (بلا Spring) ⇒ `persistence` (JdbcClient + SQL صريح).
 4. ترتيب الأقفال بـ `product_id` دائماً. `SET LOCAL lock_timeout` لكل معاملة. فحص الـ deadline قبل البدء.
