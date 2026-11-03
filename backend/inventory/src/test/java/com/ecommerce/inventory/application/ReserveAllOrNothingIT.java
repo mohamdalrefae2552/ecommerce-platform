@@ -28,7 +28,8 @@ class ReserveAllOrNothingIT extends IntegrationTest {
             List.of(
                 new ReservationLine(productId(3), 1),
                 new ReservationLine(productId(1), 2),
-                new ReservationLine(productId(2), 2)));
+                new ReservationLine(productId(2), 2)),
+            BUDGET);
 
     assertThat(result)
         .isEqualTo(
@@ -52,7 +53,8 @@ class ReserveAllOrNothingIT extends IntegrationTest {
     ReserveResult result =
         reservations.reserve(
             UUID.randomUUID(),
-            List.of(new ReservationLine(productId(2), 2), new ReservationLine(productId(1), 5)));
+            List.of(new ReservationLine(productId(2), 2), new ReservationLine(productId(1), 5)),
+            BUDGET);
 
     assertThat(result).isEqualTo(new ReserveResult.Reserved());
     assertThat(availableOf(productId(1))).isZero();

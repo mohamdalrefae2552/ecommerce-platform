@@ -18,7 +18,7 @@ class StockQueryServiceIT extends IntegrationTest {
     givenStock(productId(2), 0);
 
     List<StockLevel> levels =
-        stockQuery.getStock(List.of(productId(3), productId(2), productId(1)));
+        stockQuery.getStock(List.of(productId(3), productId(2), productId(1)), BUDGET);
 
     assertThat(levels)
         .containsExactly(

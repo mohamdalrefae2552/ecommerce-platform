@@ -26,16 +26,18 @@ class ReleaseIdempotencyIT extends IntegrationTest {
     givenStock(productId(2), 4);
     UUID id = UUID.randomUUID();
     reservations.reserve(
-        id, List.of(new ReservationLine(productId(2), 4), new ReservationLine(productId(1), 3)));
+        id,
+        List.of(new ReservationLine(productId(2), 4), new ReservationLine(productId(1), 3)),
+        BUDGET);
 
-    assertThat(reservations.release(id, ReleaseReason.ORDER_CANCELLED))
+    assertThat(reservations.release(id, ReleaseReason.ORDER_CANCELLED, BUDGET))
         .isEqualTo(ReleaseResult.RELEASED);
-    assertThat(reservations.release(id, ReleaseReason.ORDER_CANCELLED))
+    assertThat(reservations.release(id, ReleaseReason.ORDER_CANCELLED, BUDGET))
         .isEqualTo(ReleaseResult.ALREADY_RELEASED);
 
     assertThat(availableOf(productId(1))).isEqualTo(10);
     assertThat(availableOf(productId(2))).isEqualTo(4);
-    assertThat(reservations.reserve(id, List.of(new ReservationLine(productId(1), 1))))
+    assertThat(reservations.reserve(id, List.of(new ReservationLine(productId(1), 1)), BUDGET))
         .isEqualTo(new ReserveResult.AlreadyReleased());
   }
 
@@ -44,9 +46,9 @@ class ReleaseIdempotencyIT extends IntegrationTest {
     String product = productId(1);
     givenStock(product, 10);
     UUID id = UUID.randomUUID();
-    reservations.reserve(id, List.of(new ReservationLine(product, 6)));
+    reservations.reserve(id, List.of(new ReservationLine(product, 6)), BUDGET);
     Callable<ReleaseResult> release =
-        () -> reservations.release(id, ReleaseReason.ORDER_PERSISTENCE_FAILED);
+        () -> reservations.release(id, ReleaseReason.ORDER_PERSISTENCE_FAILED, BUDGET);
 
     List<ReleaseResult> results =
         ConcurrentCalls.runSimultaneously(Collections.nCopies(10, release));

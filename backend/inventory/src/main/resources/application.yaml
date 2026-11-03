@@ -22,8 +22,8 @@ spring:
       # Fail fast instead of queueing beyond the caller's deadline.
       connection-timeout: 1000
       data-source-properties:
-        # Session defaults (milliseconds) so no statement can outlive the
-        # client deadline; transactions also SET LOCAL their own (docs/05).
+        # Session defaults (milliseconds) for any statement outside a service
+        # transaction; every service transaction sets its own (inventory.db).
         options: "-c lock_timeout=${INVENTORY_LOCK_TIMEOUT_MS:1500} -c statement_timeout=${INVENTORY_STATEMENT_TIMEOUT_MS:1800}"
   flyway:
     locations: classpath:db/migration
@@ -48,6 +48,13 @@ spring:
         service:
           "[inventory.v1.InventoryService]":
             include: db
+
+# Per-transaction bounds (SET LOCAL), shortened to the remaining caller
+# deadline; both below the longest client deadline (docs/03 section 2).
+inventory:
+  db:
+    lock-timeout: ${INVENTORY_LOCK_TIMEOUT_MS:1500}ms
+    statement-timeout: ${INVENTORY_STATEMENT_TIMEOUT_MS:1800}ms
 
 # Actuator only, on the internal management port (never published; used by the
 # compose healthcheck). The application has no HTTP API.

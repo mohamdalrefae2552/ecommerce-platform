@@ -16,7 +16,7 @@ class StockAdjustmentIT extends IntegrationTest {
 
   @Test
   void aFirstRestockRegistersTheProduct() {
-    assertThat(adjustments.adjust(UUID.randomUUID(), productId(1), 5, "first delivery"))
+    assertThat(adjustments.adjust(UUID.randomUUID(), productId(1), 5, "first delivery", BUDGET))
         .isEqualTo(5);
 
     assertThat(isTracked(productId(1))).isTrue();
@@ -26,19 +26,20 @@ class StockAdjustmentIT extends IntegrationTest {
   @Test
   void aRepeatedAdjustmentIdAppliesTheDeltaOnlyOnceAndAnswersTheCurrentLevel() {
     UUID id = UUID.randomUUID();
-    adjustments.adjust(id, productId(1), 5, "");
+    adjustments.adjust(id, productId(1), 5, "", BUDGET);
 
-    assertThat(adjustments.adjust(id, productId(1), 5, "")).isEqualTo(5);
-    assertThat(adjustments.adjust(UUID.randomUUID(), productId(1), -2, "damaged")).isEqualTo(3);
-    assertThat(adjustments.adjust(id, productId(1), 5, "")).isEqualTo(3);
+    assertThat(adjustments.adjust(id, productId(1), 5, "", BUDGET)).isEqualTo(5);
+    assertThat(adjustments.adjust(UUID.randomUUID(), productId(1), -2, "damaged", BUDGET))
+        .isEqualTo(3);
+    assertThat(adjustments.adjust(id, productId(1), 5, "", BUDGET)).isEqualTo(3);
   }
 
   @Test
   void aWriteOffBeyondTheAvailableQuantityChangesNothing() {
-    adjustments.adjust(UUID.randomUUID(), productId(1), 3, "");
+    adjustments.adjust(UUID.randomUUID(), productId(1), 3, "", BUDGET);
     UUID writeOff = UUID.randomUUID();
 
-    assertThatThrownBy(() -> adjustments.adjust(writeOff, productId(1), -4, "stock count"))
+    assertThatThrownBy(() -> adjustments.adjust(writeOff, productId(1), -4, "stock count", BUDGET))
         .isInstanceOf(StockWouldBecomeNegativeException.class);
 
     assertThat(availableOf(productId(1))).isEqualTo(3);
@@ -52,7 +53,7 @@ class StockAdjustmentIT extends IntegrationTest {
 
   @Test
   void aWriteOffOnAnUnknownProductFailsAndLeavesItUntracked() {
-    assertThatThrownBy(() -> adjustments.adjust(UUID.randomUUID(), productId(9), -1, ""))
+    assertThatThrownBy(() -> adjustments.adjust(UUID.randomUUID(), productId(9), -1, "", BUDGET))
         .isInstanceOf(StockWouldBecomeNegativeException.class);
 
     assertThat(isTracked(productId(9))).isFalse();

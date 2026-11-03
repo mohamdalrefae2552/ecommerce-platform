@@ -26,9 +26,9 @@ class ReleaseBeforeReserveIT extends IntegrationTest {
     givenStock(product, 5);
     UUID id = UUID.randomUUID();
 
-    assertThat(reservations.release(id, ReleaseReason.RESERVE_OUTCOME_UNKNOWN))
+    assertThat(reservations.release(id, ReleaseReason.RESERVE_OUTCOME_UNKNOWN, BUDGET))
         .isEqualTo(ReleaseResult.NOT_FOUND_TOMBSTONED);
-    assertThat(reservations.reserve(id, List.of(new ReservationLine(product, 2))))
+    assertThat(reservations.reserve(id, List.of(new ReservationLine(product, 2)), BUDGET))
         .isEqualTo(new ReserveResult.AlreadyReleased());
 
     assertThat(availableOf(product)).isEqualTo(5);

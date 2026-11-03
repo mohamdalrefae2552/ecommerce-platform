@@ -48,7 +48,7 @@ class DeadlockFreedomIT extends IntegrationTest {
       calls.add(
           () -> {
             try {
-              assertThat(reservations.reserve(UUID.randomUUID(), lines))
+              assertThat(reservations.reserve(UUID.randomUUID(), lines, BUDGET))
                   .isEqualTo(new ReserveResult.Reserved());
               return Optional.empty();
             } catch (RuntimeException e) {

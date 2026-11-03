@@ -20,6 +20,7 @@ import com.ecommerce.inventory.grpc.v1.ReserveOutcome;
 import com.ecommerce.inventory.grpc.v1.ReserveStockRequest;
 import com.ecommerce.inventory.grpc.v1.ReserveStockResponse;
 import io.grpc.stub.StreamObserver;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -48,8 +49,9 @@ public class InventoryGrpcService extends InventoryServiceGrpc.InventoryServiceI
   @Override
   public void getStock(GetStockRequest request, StreamObserver<GetStockResponse> response) {
     List<String> productIds = RequestValidator.productIds(request.getProductIdsList());
+    Duration budget = CallBudget.remaining();
     GetStockResponse.Builder reply = GetStockResponse.newBuilder();
-    for (StockLevel level : stockQuery.getStock(productIds)) {
+    for (StockLevel level : stockQuery.getStock(productIds, budget)) {
       reply.addLevels(
           com.ecommerce.inventory.grpc.v1.StockLevel.newBuilder()
               .setProductId(level.productId())
@@ -65,9 +67,10 @@ public class InventoryGrpcService extends InventoryServiceGrpc.InventoryServiceI
       ReserveStockRequest request, StreamObserver<ReserveStockResponse> response) {
     UUID reservationId = RequestValidator.uuid("reservation_id", request.getReservationId());
     List<ReservationLine> lines = RequestValidator.reservationItems(request.getItemsList());
+    Duration budget = CallBudget.remaining();
     ReserveStockResponse.Builder reply =
         ReserveStockResponse.newBuilder().setReservationId(request.getReservationId());
-    switch (reservations.reserve(reservationId, lines)) {
+    switch (reservations.reserve(reservationId, lines, budget)) {
       case ReserveResult.Reserved reserved ->
           reply.setOutcome(ReserveOutcome.RESERVE_OUTCOME_RESERVED);
       case ReserveResult.AlreadyReleased released ->
@@ -92,8 +95,9 @@ public class InventoryGrpcService extends InventoryServiceGrpc.InventoryServiceI
       ReleaseStockRequest request, StreamObserver<ReleaseStockResponse> response) {
     UUID reservationId = RequestValidator.uuid("reservation_id", request.getReservationId());
     ReleaseReason reason = RequestValidator.releaseReason(request.getReason());
+    Duration budget = CallBudget.remaining();
     ReleaseOutcome outcome =
-        switch (reservations.release(reservationId, reason)) {
+        switch (reservations.release(reservationId, reason, budget)) {
           case RELEASED -> ReleaseOutcome.RELEASE_OUTCOME_RELEASED;
           case ALREADY_RELEASED -> ReleaseOutcome.RELEASE_OUTCOME_ALREADY_RELEASED;
           case NOT_FOUND_TOMBSTONED -> ReleaseOutcome.RELEASE_OUTCOME_NOT_FOUND_TOMBSTONED;
@@ -113,7 +117,8 @@ public class InventoryGrpcService extends InventoryServiceGrpc.InventoryServiceI
     String productId = RequestValidator.productId("product_id", request.getProductId());
     long delta = RequestValidator.delta(request.getDelta());
     String note = RequestValidator.note(request.getNote());
-    long available = adjustments.adjust(adjustmentId, productId, delta, note);
+    Duration budget = CallBudget.remaining();
+    long available = adjustments.adjust(adjustmentId, productId, delta, note, budget);
     response.onNext(
         AdjustStockResponse.newBuilder()
             .setAdjustmentId(request.getAdjustmentId())

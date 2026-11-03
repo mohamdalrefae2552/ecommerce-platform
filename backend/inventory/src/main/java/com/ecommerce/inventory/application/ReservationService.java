@@ -9,6 +9,8 @@ import com.ecommerce.inventory.domain.Shortage;
 import com.ecommerce.inventory.domain.Shortages;
 import com.ecommerce.inventory.persistence.ReservationRepository;
 import com.ecommerce.inventory.persistence.StockRepository;
+import com.ecommerce.inventory.persistence.TransactionTimeouts;
+import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -26,10 +28,13 @@ public class ReservationService {
 
   private final ReservationRepository reservations;
   private final StockRepository stock;
+  private final TransactionTimeouts timeouts;
 
-  public ReservationService(ReservationRepository reservations, StockRepository stock) {
+  public ReservationService(
+      ReservationRepository reservations, StockRepository stock, TransactionTimeouts timeouts) {
     this.reservations = reservations;
     this.stock = stock;
+    this.timeouts = timeouts;
   }
 
   /**
@@ -37,9 +42,11 @@ public class ReservationService {
    * stored reservation, and an id released earlier (tombstone) reserves nothing.
    *
    * @param lines distinct products, already validated
+   * @param budget time the caller still allows; bounds every lock wait and statement
    */
   @Transactional
-  public ReserveResult reserve(UUID reservationId, List<ReservationLine> lines) {
+  public ReserveResult reserve(UUID reservationId, List<ReservationLine> lines, Duration budget) {
+    timeouts.limitTo(budget);
     if (!reservations.insertReserved(reservationId)) {
       return switch (reservations.findStatus(reservationId).orElseThrow()) {
         case RESERVED -> new ReserveResult.Reserved();
@@ -69,9 +76,12 @@ public class ReservationService {
   /**
    * ReleaseStock (R2-C3): returns the quantities of an active reservation exactly once. An unknown
    * id gets a tombstone so that a late ReserveStock with it reserves nothing.
+   *
+   * @param budget time the caller still allows; bounds every lock wait and statement
    */
   @Transactional
-  public ReleaseResult release(UUID reservationId, ReleaseReason reason) {
+  public ReleaseResult release(UUID reservationId, ReleaseReason reason, Duration budget) {
+    timeouts.limitTo(budget);
     if (reservations.insertTombstone(reservationId, reason)) {
       return ReleaseResult.NOT_FOUND_TOMBSTONED;
     }

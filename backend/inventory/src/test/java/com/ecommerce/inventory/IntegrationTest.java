@@ -3,6 +3,7 @@ package com.ecommerce.inventory;
 import com.ecommerce.inventory.grpc.v1.InventoryServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +28,9 @@ import org.springframework.jdbc.core.simple.JdbcClient;
     })
 @Import(TestcontainersConfiguration.class)
 public abstract class IntegrationTest {
+
+  /** Time budget for direct service calls: long enough never to be the limiting factor. */
+  protected static final Duration BUDGET = Duration.ofSeconds(10);
 
   @LocalGrpcServerPort protected int grpcPort;
 

@@ -25,8 +25,8 @@ class ReserveIdempotencyIT extends IntegrationTest {
     UUID id = UUID.randomUUID();
     List<ReservationLine> lines = List.of(new ReservationLine(product, 3));
 
-    assertThat(reservations.reserve(id, lines)).isEqualTo(new ReserveResult.Reserved());
-    assertThat(reservations.reserve(id, lines)).isEqualTo(new ReserveResult.Reserved());
+    assertThat(reservations.reserve(id, lines, BUDGET)).isEqualTo(new ReserveResult.Reserved());
+    assertThat(reservations.reserve(id, lines, BUDGET)).isEqualTo(new ReserveResult.Reserved());
 
     assertThat(availableOf(product)).isEqualTo(7);
   }
@@ -37,7 +37,7 @@ class ReserveIdempotencyIT extends IntegrationTest {
     givenStock(product, 10);
     UUID id = UUID.randomUUID();
     List<ReservationLine> lines = List.of(new ReservationLine(product, 2));
-    Callable<ReserveResult> reserve = () -> reservations.reserve(id, lines);
+    Callable<ReserveResult> reserve = () -> reservations.reserve(id, lines, BUDGET);
 
     List<ReserveResult> results =
         ConcurrentCalls.runSimultaneously(Collections.nCopies(10, reserve));
