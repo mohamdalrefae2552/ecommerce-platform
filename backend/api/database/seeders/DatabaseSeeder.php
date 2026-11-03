@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Modules\Products\Database\Seeders\CategorySeeder;
 use App\Modules\Users\Database\Seeders\CustomerSeeder;
 use Illuminate\Database\Seeder;
 
@@ -18,6 +19,7 @@ final class DatabaseSeeder extends Seeder
      * @var list<class-string<Seeder>>
      */
     private const array SEEDERS = [
+        CategorySeeder::class,
         CustomerSeeder::class,
     ];
 
