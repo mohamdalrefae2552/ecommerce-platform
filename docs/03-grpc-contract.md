@@ -26,7 +26,9 @@ autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/
 | مدخل غير صالح (ULID خاطئ، كمية خارج 1..1000، بنود مكررة، قائمة فارغة/أكثر من 100، reservation_id/adjustment_id ليس UUID، `reason = RELEASE_REASON_UNSPECIFIED`، `delta = 0` أو \|delta\| > 1,000,000، `note` > 200 حرف) | `INVALID_ARGUMENT` + رسالة تصف الحقل |
 | AdjustStock يجعل الكمية سالبة | `FAILED_PRECONDITION` |
 | انتهاء المهلة/إلغاء العميل | `DEADLINE_EXCEEDED` / `CANCELLED` |
-| `lock_timeout` في DB | `ABORTED` (العميل يعامله كـ UNAVAILABLE) |
+| `lock_timeout` في DB، deadlock، فشل serialization | `ABORTED` (العميل يعامله كـ UNAVAILABLE) |
+| `statement_timeout` في DB | `DEADLINE_EXCEEDED` إن انتهت مهلة العميل، وإلا `ABORTED` |
+| لا اتصال بقاعدة المخزون (pool ممتلئ أو DB متوقفة) | `UNAVAILABLE` |
 | أي استثناء آخر | `INTERNAL` (بلا تفاصيل داخلية في الرسالة، التفاصيل في الـ log مع request-id) |
 | نقص الكمية | **ليس خطأ**: `OK` + `RESERVE_OUTCOME_INSUFFICIENT_STOCK` |
 

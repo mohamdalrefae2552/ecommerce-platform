@@ -35,10 +35,10 @@
 | Testcontainers | تكامل | BOM `2.0.5` — الحزمة **`org.testcontainers:testcontainers-postgresql`** (الاسم القديم توقف عند 1.21.4) | 2026-04-20 | ✅ | repo1.maven.org/…/testcontainers-postgresql |
 | Flyway + flyway-database-postgresql | الهجرات | BOM `12.4.0` | 2026-04-14 | ✅ — Redgate يدرج PostgreSQL 18 كمُتحقَّق | documentation.red-gate.com/fd/postgresql |
 | PostgreSQL JDBC | المشغّل | BOM `42.7.14` | 2026-10-07 | ✅ | Maven Central |
-| Spotless (Gradle) | التنسيق | `8.10.4` + google-java-format `1.37.0` | 2026-10-08 / 2026-10-01 | ✅ (gjf 2.0.0 غير مدعوم في Spotless بعد) | github.com/diffplug/spotless |
+| Spotless (Gradle) | التنسيق | `8.10.4` + google-java-format `1.36.1` | 2026-10-08 | ✅ (1.37.0 يفشل مع Spotless 8.10.4: `NoSuchMethodError Style.valueOf`؛ 1.36.1 هو افتراضي Spotless) | github.com/diffplug/spotless |
 | Error Prone + net.ltgt.errorprone | فحص ثابت | `2.51.0` + plugin `5.2.0` | 2026-10-22 / 2026-10-30 | ⚠️ يعمل على JDK ≥ 21؛ لا تصريح رسمي بـ 25 — يُثبت عملياً في P0-INV-01 | github.com/google/error-prone |
 | JaCoCo | التغطية | `0.8.16` (`jacoco { toolVersion }` صريحاً) | 2026-10-26 | ✅ Java 25 منذ 0.8.14 | github.com/jacoco/jacoco |
-| Eclipse Temurin | التشغيل | `eclipse-temurin:25.0.5_8-jre-alpine-3.24` (بناء: `25.0.5_8-jdk-alpine-3.24`) | 2026-10-29 | ✅ | hub.docker.com/_/eclipse-temurin |
+| Eclipse Temurin | التشغيل | `eclipse-temurin:25.0.5_8-jre-noble` (بناء واختبار: `25.0.5_8-jdk-noble`؛ noble لأن Testcontainers/JDK على glibc أبسط، و wget يُثبَّت للـ healthcheck) | 2026-10-29 | ✅ | hub.docker.com/_/eclipse-temurin |
 
 ### JavaScript — `frontend`
 | الحزمة | الغرض | الإصدار المثبت | تاريخ الإصدار | التوافق | المصدر |
