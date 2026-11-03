@@ -1,0 +1,162 @@
+# Merge gate for main (W-1). Job ids are the required status checks in the
+# branch-protection command (docs/07 section 7): contracts, api, inventory,
+# web, e2e. A job skipped by the path filter counts as passing; e2e always
+# runs on pull requests to main.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  # compose.ci.yaml: BuildKit layer cache in GitHub Actions + bind-mounted
+  # dependency caches restored by actions/cache.
+  COMPOSE_CI: "1"
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      contracts: ${{ steps.filter.outputs.contracts }}
+      api: ${{ steps.filter.outputs.api }}
+      inventory: ${{ steps.filter.outputs.inventory }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared: &shared
+              - 'Makefile'
+              - 'compose*.yaml'
+              - 'infra/**'
+              - '.github/workflows/**'
+            contracts:
+              - *shared
+              - 'contracts/**'
+            api:
+              - *shared
+              - 'contracts/**'
+              - 'backend/api/**'
+            inventory:
+              - *shared
+              - 'contracts/proto/**'
+              - 'backend/inventory/**'
+            web:
+              - *shared
+              - 'contracts/openapi/**'
+              - 'frontend/**'
+
+  contracts:
+    needs: changes
+    if: needs.changes.outputs.contracts == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # buf breaking compares against main
+      - name: Fetch main for the breaking-change check
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+      - run: cp .env.example .env
+      - run: make lint-contracts
+      - name: Generated code is up to date
+        if: hashFiles('backend/api/composer.json') != ''
+        run: |
+          make gen
+          git diff --exit-code -- backend/api/generated frontend/src/api/schema.d.ts
+
+  api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: crazy-max/ghaction-github-runtime@v3 # exposes the GHA cache to BuildKit
+      - run: cp .env.example .env
+      - run: make verify-api
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-reports
+          path: backend/api/build/reports/
+          if-no-files-found: ignore
+
+  inventory:
+    needs: changes
+    if: needs.changes.outputs.inventory == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: .cache/gradle
+          key: gradle-${{ hashFiles('backend/inventory/**/*.gradle.kts', 'backend/inventory/gradle/**') }}
+          restore-keys: gradle-
+      - run: mkdir -p .cache/gradle && cp .env.example .env
+      - run: make verify-inventory
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inventory-reports
+          path: |
+            backend/inventory/build/reports/
+            backend/inventory/build/test-results/
+          if-no-files-found: ignore
+
+  web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: crazy-max/ghaction-github-runtime@v3
+      - uses: actions/cache@v4
+        with:
+          path: .cache/pnpm
+          key: pnpm-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: pnpm-
+      - run: mkdir -p .cache/pnpm && cp .env.example .env
+      - run: make verify-web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-coverage
+          path: frontend/coverage/
+          if-no-files-found: ignore
+
+  e2e:
+    needs: [contracts, api, inventory, web]
+    # Runs on every PR even when the jobs it waits for were skipped.
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: crazy-max/ghaction-github-runtime@v3
+      - run: cp .env.example .env
+      - run: make bootstrap
+      - run: make up
+      - run: make verify-e2e
+      - name: Service logs on failure
+        if: failure()
+        run: make ps && docker compose -p ecommerce-platform logs --tail=200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report/
+          if-no-files-found: ignore
