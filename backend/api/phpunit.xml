@@ -29,13 +29,13 @@
     </source>
     <php>
         <!-- DB_* come from the api-test service: a real PostgreSQL (db-app-test), never SQLite. -->
-        <env name="APP_ENV" value="testing" force="true"/>
-        <env name="APP_DEBUG" value="false" force="true"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_STORE" value="array" force="true"/>
-        <env name="MAIL_MAILER" value="array" force="true"/>
-        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
-        <env name="SESSION_DRIVER" value="array" force="true"/>
-        <env name="LOG_CHANNEL" value="stderr"/>
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_DEBUG" value="false" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <!-- Exceptions are reported to the log; keep test output readable. -->
+        <server name="LOG_CHANNEL" value="null" force="true"/>
     </php>
 </phpunit>

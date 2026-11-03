@@ -92,7 +92,7 @@ final class OpenApiContract
     /**
      * @return array<mixed>
      */
-    private static function document(): array
+    public static function document(): array
     {
         if (self::$document === null) {
             $document = Yaml::parseFile(self::path());
