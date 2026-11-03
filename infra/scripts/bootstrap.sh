@@ -14,6 +14,16 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
 fi
 
+# fill_secret <VAR>: generate a random value for an empty VAR in .env.
+fill_secret() {
+  if grep -qE "^$1=$" .env; then
+    step "generating $1"
+    sed -i "s#^$1=\$#$1=$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)#" .env
+  fi
+}
+fill_secret SEED_CUSTOMER_PASSWORD
+fill_secret DEV_ADMIN_PASSWORD
+
 step "building images"
 "${compose[@]}" build
 
@@ -41,5 +51,12 @@ fi
 step "running migrations and seeders"
 "${artisan[@]}" migrate --force
 "${artisan[@]}" db:seed --force
+
+if "${artisan[@]}" list --raw | grep -q '^app:create-admin'; then
+  step "creating the dev admin (D-05)"
+  "${artisan[@]}" app:create-admin --dev
+else
+  echo "• app:create-admin is not available yet (added by P1-API-02)"
+fi
 
 printf '\n✓ bootstrap done. Next: make up\n'
