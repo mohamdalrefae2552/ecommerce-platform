@@ -18,7 +18,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = "spring.grpc.server.port=0")
+    properties = {
+      "spring.grpc.server.port=0",
+      // Concurrency tests run more callers than pool connections on a slow Docker VM; they
+      // measure locking, not pool sizing, so callers may queue for a connection longer than the
+      // production fail-fast wait.
+      "spring.datasource.hikari.connection-timeout=10000"
+    })
 @Import(TestcontainersConfiguration.class)
 public abstract class IntegrationTest {
 

@@ -33,6 +33,39 @@ public class StockRepository {
             .list());
   }
 
+  /**
+   * Locks the rows of the given products with {@code FOR UPDATE}, always in product_id order so
+   * that concurrent transactions take the locks in the same order and cannot deadlock (ADR-0005).
+   * Unknown products are absent from the result.
+   */
+  public Map<String, Long> lockAvailable(Collection<String> productIds) {
+    return toMap(
+        jdbc.sql(
+                """
+                SELECT product_id, available
+                  FROM stock_items
+                 WHERE product_id IN (:ids)
+                 ORDER BY product_id
+                   FOR UPDATE
+                """)
+            .param("ids", productIds)
+            .query(StockRepository::availability)
+            .list());
+  }
+
+  /** Takes units from a locked row; the CHECK (available >= 0) rejects any oversell. */
+  public void decrement(String productId, int quantity) {
+    jdbc.sql(
+            """
+            UPDATE stock_items
+               SET available = available - :quantity, updated_at = now()
+             WHERE product_id = :productId
+            """)
+        .param("quantity", quantity)
+        .param("productId", productId)
+        .update();
+  }
+
   private static Map.Entry<String, Long> availability(ResultSet rs, int rowNum)
       throws SQLException {
     return Map.entry(rs.getString("product_id"), rs.getLong("available"));
