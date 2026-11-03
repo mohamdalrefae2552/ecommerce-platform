@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Modules\Users\Database\Seeders\CustomerSeeder;
 use Illuminate\Database\Seeder;
 
 /**
@@ -16,7 +17,9 @@ final class DatabaseSeeder extends Seeder
     /**
      * @var list<class-string<Seeder>>
      */
-    private const array SEEDERS = [];
+    private const array SEEDERS = [
+        CustomerSeeder::class,
+    ];
 
     public function run(): void
     {

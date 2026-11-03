@@ -31,6 +31,8 @@
         <!-- DB_* come from the api-test service: a real PostgreSQL (db-app-test), never SQLite. -->
         <server name="APP_ENV" value="testing" force="true"/>
         <server name="APP_DEBUG" value="false" force="true"/>
+        <server name="ARGON_MEMORY" value="1024" force="true"/>
+        <server name="ARGON_TIME" value="1" force="true"/>
         <server name="CACHE_STORE" value="array" force="true"/>
         <server name="MAIL_MAILER" value="array" force="true"/>
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>

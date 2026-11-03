@@ -25,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // X-Request-Id and the security headers. RequestId runs first.
         $middleware->prepend([RequestId::class, SecurityHeaders::class, ForceJsonResponse::class]);
         $middleware->api(append: [EnforceRequestBody::class]);
+        // General limit: 120 per minute per user or IP (docs/04 section 3).
+        $middleware->throttleApi();
         // php-fpm is reached over FastCGI from edge: REMOTE_ADDR is the real
         // client and edge drops forwarding headers, so no proxy is trusted.
         $middleware->trustProxies(at: []);
