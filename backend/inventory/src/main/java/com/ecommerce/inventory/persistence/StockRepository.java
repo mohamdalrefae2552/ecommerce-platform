@@ -1,11 +1,13 @@
 package com.ecommerce.inventory.persistence;
 
+import com.ecommerce.inventory.domain.StockWouldBecomeNegativeException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -64,6 +66,58 @@ public class StockRepository {
         .param("quantity", quantity)
         .param("productId", productId)
         .update();
+  }
+
+  /** Gives units back to a locked row (release of a reservation). */
+  public void increment(String productId, int quantity) {
+    jdbc.sql(
+            """
+            UPDATE stock_items
+               SET available = available + :quantity, updated_at = now()
+             WHERE product_id = :productId
+            """)
+        .param("quantity", quantity)
+        .param("productId", productId)
+        .update();
+  }
+
+  /** Registers a product seen for the first time with zero units; no-op when it exists. */
+  public void insertIfAbsent(String productId) {
+    jdbc.sql(
+            """
+            INSERT INTO stock_items (product_id, available)
+            VALUES (:productId, 0)
+            ON CONFLICT (product_id) DO NOTHING
+            """)
+        .param("productId", productId)
+        .update();
+  }
+
+  /**
+   * Applies an administrative delta and returns the new level.
+   *
+   * @throws StockWouldBecomeNegativeException when the CHECK (available >= 0) rejects the result;
+   *     the transaction must then roll back
+   */
+  public long add(String productId, long delta) {
+    try {
+      return jdbc.sql(
+              """
+              UPDATE stock_items
+                 SET available = available + :delta, updated_at = now()
+               WHERE product_id = :productId
+              RETURNING available
+              """)
+          .param("delta", delta)
+          .param("productId", productId)
+          .query(Long.class)
+          .single();
+    } catch (DataIntegrityViolationException e) {
+      if (SqlStates.of(e).filter(SqlStates.CHECK_VIOLATION::equals).isPresent()) {
+        throw new StockWouldBecomeNegativeException(productId, e);
+      }
+      throw e;
+    }
   }
 
   private static Map.Entry<String, Long> availability(ResultSet rs, int rowNum)

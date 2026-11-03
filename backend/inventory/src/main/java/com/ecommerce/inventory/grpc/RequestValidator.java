@@ -1,5 +1,6 @@
 package com.ecommerce.inventory.grpc;
 
+import com.ecommerce.inventory.domain.ReleaseReason;
 import com.ecommerce.inventory.domain.ReservationLine;
 import com.ecommerce.inventory.grpc.v1.ReservationItem;
 import java.util.ArrayList;
@@ -25,6 +26,8 @@ final class RequestValidator {
   static final int MAX_PRODUCT_IDS = 100;
   static final int MAX_ITEMS = 100;
   static final int MAX_QUANTITY = 1000;
+  static final long MAX_ABS_DELTA = 1_000_000;
+  static final int MAX_NOTE_LENGTH = 200;
 
   private RequestValidator() {}
 
@@ -69,6 +72,36 @@ final class RequestValidator {
       }
     }
     return List.copyOf(productIds);
+  }
+
+  /** ReleaseStock reason: must be one of the defined reasons, never UNSPECIFIED. */
+  static ReleaseReason releaseReason(com.ecommerce.inventory.grpc.v1.ReleaseReason reason) {
+    return switch (reason) {
+      case RELEASE_REASON_ORDER_PERSISTENCE_FAILED -> ReleaseReason.ORDER_PERSISTENCE_FAILED;
+      case RELEASE_REASON_RESERVE_OUTCOME_UNKNOWN -> ReleaseReason.RESERVE_OUTCOME_UNKNOWN;
+      case RELEASE_REASON_ORDER_CANCELLED -> ReleaseReason.ORDER_CANCELLED;
+      case RELEASE_REASON_RECONCILIATION -> ReleaseReason.RECONCILIATION;
+      case RELEASE_REASON_UNSPECIFIED, UNRECOGNIZED ->
+          throw new InvalidRequestException("reason must be a defined RELEASE_REASON_* value");
+    };
+  }
+
+  /** AdjustStock delta: non-zero, |delta| <= 1,000,000. */
+  static long delta(long delta) {
+    if (delta == 0 || Math.abs(delta) > MAX_ABS_DELTA) {
+      throw new InvalidRequestException(
+          "delta must be non-zero and between -" + MAX_ABS_DELTA + " and " + MAX_ABS_DELTA);
+    }
+    return delta;
+  }
+
+  /** AdjustStock note: at most 200 characters, may be empty. */
+  static String note(String note) {
+    if (note.codePointCount(0, note.length()) > MAX_NOTE_LENGTH) {
+      throw new InvalidRequestException(
+          "note must be at most " + MAX_NOTE_LENGTH + " characters long");
+    }
+    return note;
   }
 
   static String productId(String field, String value) {

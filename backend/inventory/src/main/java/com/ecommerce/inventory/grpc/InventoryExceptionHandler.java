@@ -1,5 +1,6 @@
 package com.ecommerce.inventory.grpc;
 
+import com.ecommerce.inventory.domain.StockWouldBecomeNegativeException;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
@@ -25,6 +26,10 @@ public class InventoryExceptionHandler implements GrpcExceptionHandler {
       case StatusRuntimeException e -> e.getStatus().asException(e.getTrailers());
       case InvalidRequestException e ->
           Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException();
+      case StockWouldBecomeNegativeException e ->
+          Status.FAILED_PRECONDITION
+              .withDescription("the adjustment would make the available quantity negative")
+              .asException();
       default -> {
         log.error("Unexpected failure in a gRPC call", exception);
         yield Status.INTERNAL.withDescription("internal error").asException();

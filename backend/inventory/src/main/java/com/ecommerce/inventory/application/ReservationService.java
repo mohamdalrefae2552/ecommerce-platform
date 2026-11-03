@@ -1,6 +1,9 @@
 package com.ecommerce.inventory.application;
 
+import com.ecommerce.inventory.domain.ReleaseReason;
+import com.ecommerce.inventory.domain.ReleaseResult;
 import com.ecommerce.inventory.domain.ReservationLine;
+import com.ecommerce.inventory.domain.ReservationStatus;
 import com.ecommerce.inventory.domain.ReserveResult;
 import com.ecommerce.inventory.domain.Shortage;
 import com.ecommerce.inventory.domain.Shortages;
@@ -14,7 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
-/** ReserveStock (R2-C2): the algorithm of docs/05 section 2, in one READ COMMITTED transaction. */
+/**
+ * ReserveStock (R2-C2) and ReleaseStock (R2-C3): the algorithms of docs/05 section 2, each in one
+ * READ COMMITTED transaction. Stock rows are always locked in product_id order.
+ */
 @Service
 public class ReservationService {
 
@@ -58,5 +64,27 @@ public class ReservationService {
       reservations.insertLine(reservationId, line.productId(), line.quantity());
     }
     return new ReserveResult.Reserved();
+  }
+
+  /**
+   * ReleaseStock (R2-C3): returns the quantities of an active reservation exactly once. An unknown
+   * id gets a tombstone so that a late ReserveStock with it reserves nothing.
+   */
+  @Transactional
+  public ReleaseResult release(UUID reservationId, ReleaseReason reason) {
+    if (reservations.insertTombstone(reservationId, reason)) {
+      return ReleaseResult.NOT_FOUND_TOMBSTONED;
+    }
+    if (reservations.lockStatus(reservationId).orElseThrow() == ReservationStatus.RELEASED) {
+      return ReleaseResult.ALREADY_RELEASED;
+    }
+
+    List<ReservationLine> lines = reservations.findLines(reservationId);
+    stock.lockAvailable(lines.stream().map(ReservationLine::productId).toList());
+    for (ReservationLine line : lines) {
+      stock.increment(line.productId(), line.quantity());
+    }
+    reservations.markReleased(reservationId, reason);
+    return ReleaseResult.RELEASED;
   }
 }
