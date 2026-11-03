@@ -1,0 +1,20 @@
+{
+  "name": "ecommerce-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "End-to-end proofs against the full compose stack (Playwright + Toxiproxy).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:harness": "playwright test --project=harness",
+    "typecheck": "tsc --noEmit",
+    "verify": "tsc --noEmit && playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "^24.19.2",
+    "typescript": "~5.9.3"
+  }
+}

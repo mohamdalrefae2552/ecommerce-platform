@@ -1,0 +1,12 @@
+### Requests runnable from the VS Code REST Client / JetBrains HTTP Client.
+### The demo scenarios (docs/04 section 8) are added next to this file in P1-QA-01.
+@edge = http://localhost:8080
+@api = {{edge}}/api/v1
+
+### Health (operationId getHealth): 200 {"status":"ok","checks":{"db":"ok","inventory":"ok|degraded"}}
+GET {{api}}/health
+Accept: application/json
+
+### Unknown API path: edge answers problem+json 404 NOT_FOUND, never HTML
+GET {{edge}}/api
+Accept: application/json
