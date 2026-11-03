@@ -1,0 +1,18 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/pestphp/pest/extension.neon
+
+parameters:
+    level: max
+    paths:
+        - app
+        - bootstrap/app.php
+        - bootstrap/providers.php
+        - config
+        - database
+        - routes
+        - tests
+    bootstrapFiles:
+        - tests/Support/phpstan-bootstrap.php
+    tmpDir: /tmp/phpstan
+    treatPhpDocTypesAsCertain: false
