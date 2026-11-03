@@ -31,6 +31,9 @@ SCRIPTS   := infra/scripts
 # Base the breaking-change check on the remote main when it exists.
 BREAKING_BASE ?= $(shell git rev-parse --verify -q origin/main >/dev/null && echo origin/main || echo main)
 
+# Dev/test credentials for the host-side proof scripts (D-04, D-05).
+DEMO_ENV = DEV_ADMIN_EMAIL="$(call env_value,DEV_ADMIN_EMAIL)" DEV_ADMIN_PASSWORD="$(call env_value,DEV_ADMIN_PASSWORD)"   SEED_CUSTOMER_COUNT="$(call env_value,SEED_CUSTOMER_COUNT)" SEED_CUSTOMER_PASSWORD="$(call env_value,SEED_CUSTOMER_PASSWORD)"
+
 # need <path> <task id>: fail clearly when a component does not exist yet.
 define need
 	@test -e "$(1)" || { echo "✗ '$(1)' does not exist yet — it is created by task $(2)." >&2; exit 1; }
@@ -141,15 +144,15 @@ race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [
 	$(need_docker)
 	$(call need,tests/load/race.js,P2-QA-01)
 	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run /work/tests/load/race.js
-	@EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/race-verify.sh
+	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/race-verify.sh
 
 demo-r1: ## Interview demo, requirement 1 (IDOR, 403, rate limit, JWT, headers)
 	$(call need,tests/security/scripts/demo-r1.sh,P1-QA-01)
-	@EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r1.sh
+	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r1.sh
 
 demo-r2: ## Interview demo, requirement 2 (race, inventory down/slow)
 	$(call need,tests/security/scripts/demo-r2.sh,P2-QA-02)
-	@EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r2.sh
+	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r2.sh
 
 # ----------------------------------------------------------------- chaos --
 # Toxiproxy sits between api/scheduler and inventory (docs/01 section 1).
