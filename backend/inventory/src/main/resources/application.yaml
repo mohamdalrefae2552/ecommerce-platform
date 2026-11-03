@@ -1,0 +1,75 @@
+# Every runtime value comes from the environment set in compose.yaml; the
+# defaults below are for local runs only. No secret has a default.
+spring:
+  application:
+    name: inventory
+  main:
+    banner-mode: "off"
+  threads:
+    virtual:
+      enabled: true
+  lifecycle:
+    # Below Docker's default 10 s stop timeout, above the longest client
+    # deadline (ReserveStock 2 s, order budget 3 s — docs/03 section 2).
+    timeout-per-shutdown-phase: 8s
+  datasource:
+    url: jdbc:postgresql://${INVENTORY_DB_HOST:localhost}:${INVENTORY_DB_PORT:5432}/${INVENTORY_DB_NAME:inventory}
+    username: ${INVENTORY_DB_USERNAME:inventory}
+    password: ${INVENTORY_DB_PASSWORD:}
+    hikari:
+      pool-name: inventory
+      maximum-pool-size: ${INVENTORY_HIKARI_MAX_POOL:20}
+      # Fail fast instead of queueing beyond the caller's deadline.
+      connection-timeout: 1000
+      data-source-properties:
+        # Session defaults (milliseconds) so no statement can outlive the
+        # client deadline; transactions also SET LOCAL their own (docs/05).
+        options: "-c lock_timeout=${INVENTORY_LOCK_TIMEOUT_MS:1500} -c statement_timeout=${INVENTORY_STATEMENT_TIMEOUT_MS:1800}"
+  flyway:
+    locations: classpath:db/migration
+  grpc:
+    server:
+      port: ${INVENTORY_GRPC_PORT:9090}
+      # Native Netty server on its own port, not the servlet container.
+      servlet:
+        enabled: false
+      shutdown:
+        # In-flight calls finish (client deadlines are <= 3 s), new ones are refused.
+        grace-period: 5s
+      reflection:
+        enabled: true
+      health:
+        enabled: true
+        schedule:
+          # Publish the first status right after start-up (default waits 5 s).
+          delay: 0s
+        # grpc.health.v1: "" = overall application health; the inventory service
+        # itself is SERVING only while its database is UP.
+        service:
+          "[inventory.v1.InventoryService]":
+            include: db
+
+# Actuator only, on the internal management port (never published; used by the
+# compose healthcheck). The application has no HTTP API.
+server:
+  port: 8081
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        name: inventory
