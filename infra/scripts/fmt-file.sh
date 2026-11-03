@@ -20,7 +20,9 @@ root="$(cd "$root" && pwd -P)"
 rel="${abs#"$root"/}"
 compose=(docker compose -p "${PROJECT:?}" --project-directory "$root")
 
-running() { [[ -n "$("${compose[@]}" ps --status running -q "$1" 2>/dev/null)" ]]; }
+# has_image <compose service>: the service image exists locally (no build/pull
+# inside a 60 s hook).
+has_image() { [[ -n "$("${compose[@]}" --profile test --profile tools images -q "$1" 2>/dev/null)" ]] || docker image inspect "${PROJECT}-$1" >/dev/null 2>&1; }
 
 # run_or_invalid <cmd...>: on failure print the FMT_INVALID marker.
 run_or_invalid() {
@@ -35,8 +37,10 @@ run_or_invalid() {
 case "$rel" in
   backend/api/generated/*) exit 0 ;;
   backend/api/*.php)
-    running api || exit 0
-    run_or_invalid "${compose[@]}" exec -T api vendor/bin/pint --quiet "${rel#backend/api/}"
+    # Pint from the test image (it has dev dependencies), run against the
+    # host file mounted at /src so the change lands in the working tree.
+    has_image api-test || exit 0
+    run_or_invalid "${compose[@]}" --profile test run --rm --no-deps -T -v "$root/backend/api:/src" -w /src api-test /app/vendor/bin/pint --quiet "${rel#backend/api/}"
     ;;
   backend/inventory/*.java)
     # Spotless on a single file costs a Gradle start-up (> hook timeout);
@@ -45,13 +49,14 @@ case "$rel" in
     ;;
   frontend/src/api/schema.d.ts) exit 0 ;;
   frontend/*.ts | frontend/*.tsx | frontend/*.js | frontend/*.mjs | frontend/*.css | frontend/*.json | frontend/*.md)
-    running web-dev || exit 0
-    run_or_invalid "${compose[@]}" exec -T web-dev pnpm exec prettier --write --log-level warn "${rel#frontend/}"
+    has_image web-test || exit 0
+    # Prettier missing (node_modules not installed yet) is not the file's fault.
+    "${compose[@]}" --profile test run --rm --no-deps -T web-test pnpm exec prettier --version >/dev/null 2>&1 || exit 0
+    run_or_invalid "${compose[@]}" --profile test run --rm --no-deps -T web-test pnpm exec prettier --write --log-level warn "${rel#frontend/}"
     ;;
   contracts/proto/*.proto)
-    docker image inspect "${PROJECT}-protoc" >/dev/null 2>&1 || exit 0
-    run_or_invalid "${compose[@]}" --profile tools run --rm --no-deps -T -w /work/contracts/proto \
-      protoc buf format -w "${rel#contracts/proto/}"
+    docker image inspect bufbuild/buf:1.75.0 >/dev/null 2>&1 || exit 0
+    run_or_invalid "${compose[@]}" --profile tools run --rm --no-deps -T -w /work/contracts/proto buf buf format -w "${rel#contracts/proto/}"
     ;;
   *) exit 0 ;;
 esac

@@ -10,13 +10,20 @@ SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
 .DEFAULT_GOAL := help
 MAKEFLAGS += --no-print-directory
+# Git Bash on Windows rewrites container paths such as `-w /work/...` into
+# host paths (C:/Program Files/Git/work/...); disable that conversion.
+export MSYS_NO_PATHCONV := 1
+export MSYS2_ARG_CONV_EXCL := *
 
 ENV_FILE := $(if $(wildcard .env),.env,.env.example)
 env_value = $(shell sed -n 's/^$(1)=//p' $(ENV_FILE) | tail -n1 | tr -d '"\r')
 
 PROJECT   ?= $(or $(call env_value,COMPOSE_PROJECT_NAME),$(notdir $(CURDIR)))
 EDGE_PORT ?= $(or $(call env_value,EDGE_PORT),8080)
-COMPOSE   := docker compose -p $(PROJECT)
+# ENV=prod drops the development overlay (mailpit UI port, Vite dev server);
+# COMPOSE_CI=1 adds the CI caches (compose.ci.yaml).
+COMPOSE_FILES := -f compose.yaml $(if $(filter prod,$(ENV)),,-f compose.dev.yaml) $(if $(COMPOSE_CI),-f compose.ci.yaml)
+COMPOSE   := docker compose -p $(PROJECT) $(COMPOSE_FILES)
 TOOLS     := $(COMPOSE) --profile tools
 TESTS     := $(COMPOSE) --profile test
 SCRIPTS   := infra/scripts
@@ -77,10 +84,10 @@ lint-contracts: ## buf lint + buf breaking (vs main) + Redocly lint (zero warnin
 	@rm -rf .cache/breaking-base && mkdir -p .cache/breaking-base
 	@if git rev-parse --verify -q "$(BREAKING_BASE):contracts/proto" >/dev/null; then \
 	  git archive "$(BREAKING_BASE)" contracts/proto | tar -x -C .cache/breaking-base; fi
-	$(TOOLS) run --rm --no-deps -w /work/contracts/proto protoc buf lint
-	$(TOOLS) run --rm --no-deps -w /work/contracts/proto protoc buf format -d --exit-code
+	$(TOOLS) run --rm --no-deps -w /work/contracts/proto buf buf lint
+	$(TOOLS) run --rm --no-deps -w /work/contracts/proto buf buf format -d --exit-code
 	@if [ -d .cache/breaking-base/contracts/proto ]; then \
-	  $(TOOLS) run --rm --no-deps -w /work/contracts/proto protoc \
+	  $(TOOLS) run --rm --no-deps -w /work/contracts/proto buf \
 	    buf breaking --against /work/.cache/breaking-base/contracts/proto; \
 	else echo "• buf breaking skipped: $(BREAKING_BASE) has no contracts/proto yet"; fi
 	$(TOOLS) run --rm --no-deps redocly lint contracts/openapi/openapi.yaml --config contracts/openapi/redocly.yaml
@@ -88,7 +95,7 @@ lint-contracts: ## buf lint + buf breaking (vs main) + Redocly lint (zero warnin
 gen: ## Generate PHP gRPC stubs (from proto) and TS types (from OpenAPI)
 	$(need_docker)
 	$(call need,backend/api,P0-API-01)
-	$(TOOLS) run --rm --no-deps -w /work/contracts/proto protoc buf generate
+	$(TOOLS) run --rm --no-deps -w /work/contracts/proto buf buf generate
 	@if [ -f frontend/package.json ]; then \
 	  $(TESTS) run --rm --no-deps web-test sh -c "pnpm install --frozen-lockfile && pnpm run gen:api"; \
 	else echo "• TS types skipped: frontend/ is created by P0-WEB-01"; fi

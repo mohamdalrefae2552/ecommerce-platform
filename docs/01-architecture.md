@@ -34,7 +34,7 @@ flowchart LR
 | `mailpit` | `axllent/mailpit` | بريد الإشعارات في التطوير |
 | `web-dev` (profile `dev`) | Vite dev server | proxy `/api` → `edge` |
 | `k6` (profile `tools`) | `grafana/k6` | `tests/load/` |
-| `protoc` (profile `tools`) | `infra/protoc/Dockerfile` | توليد PHP stubs (`protoc` + `grpc_php_plugin`) |
+| `buf` (profile `tools`) | `bufbuild/buf:1.75.0` | lint/breaking/format + توليد PHP stubs بإضافات BSR مثبتة الإصدار (`buf.gen.yaml`) |
 | `toolbox` (profile `tools`) | `infra/toolbox/Dockerfile` | `grpcurl` + `psql` + `jq` + `curl` للعرض والتشخيص؛ متصل بالشبكتين (أداة تشخيص فقط، ليست جزءاً من التطبيق) |
 
 **عزل الشبكات (يثبت R2-S2 مادياً):**

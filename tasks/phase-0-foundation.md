@@ -46,7 +46,7 @@
 
 ### P0-LEAD-06 · Docker Compose + nginx + أدوات
 - المالك: Lead · العضو: B · الفرع: `chore/p0-platform` · يعتمد على: P0-LEAD-05
-- النطاق: `compose.yaml`, `compose.dev.yaml`, `infra/nginx/**`, `infra/protoc/Dockerfile`, `infra/toolbox/Dockerfile`, `infra/toxiproxy/toxiproxy.json`.
+- النطاق: `compose.yaml`, `compose.dev.yaml`, `infra/nginx/**`, `infra/toolbox/Dockerfile`, `infra/toxiproxy/toxiproxy.json`.
 - الخطوات: كل الخدمات في `docs/01` §2 بالشبكتين المعزولتين؛ healthchecks حقيقية لكل خدمة و `depends_on: condition: service_healthy`؛ `restart: unless-stopped`؛ volumes مسماة؛ لا منفذ منشور إلا `edge` (`${EDGE_PORT:-8080}`) و mailpit UI في dev؛ nginx: `/api` → php-fpm، `/storage` → volume الصور، `/docs` → swagger، `/` → SPA مع fallback لـ `index.html`، ترويسات أمان الواجهة (`docs/04` §4)، `server_tokens off`، `client_max_body_size 3m`، توليد `X-Request-Id` إن غاب؛ صفحات خطأ nginx لمسارات `/api` (413، 502، 504) تُعاد كـ `application/problem+json` بنفس صيغة العقد عبر `error_page` + `location` داخلي (لا HTML أبداً على `/api`)؛ Toxiproxy يُهيأ عند الإقلاع بـ proxy `inventory`.
 - معايير القبول: `make up` ⇒ `make ps` يعرض الكل healthy خلال ≤ 120s على جهاز نظيف (بعد البناء)؛ `docker compose exec api getent hosts db-inventory` يفشل (العزل)؛ `curl -sI localhost:8080` يعرض ترويسات الأمان.
 
