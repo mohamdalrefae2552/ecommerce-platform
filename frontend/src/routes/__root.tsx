@@ -40,7 +40,12 @@ function Navigation() {
         </li>
         {!isAdmin && (
           <li>
-            <Link to="/cart">السلة ({cart.length})</Link>
+            <Link to="/cart">
+              السلة
+              <span className="cart-count" aria-label={`${String(cart.length)} في السلة`}>
+                {cart.length}
+              </span>
+            </Link>
           </li>
         )}
         {session.status === 'authenticated' && (
@@ -111,7 +116,9 @@ function RootLayout() {
         <Outlet />
       </main>
       <footer>
-        <HealthStatus />
+        <div className="footer-inner">
+          <HealthStatus />
+        </div>
       </footer>
       <Toaster />
     </>

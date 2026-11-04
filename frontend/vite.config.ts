@@ -46,6 +46,8 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       sourcemap: false,
+      // CSP is default-src 'self': fonts and images must be files, never data: URIs.
+      assetsInlineLimit: 0,
     },
     test: {
       environment: 'jsdom',

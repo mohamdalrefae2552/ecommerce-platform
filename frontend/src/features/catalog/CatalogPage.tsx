@@ -22,8 +22,12 @@ export function CatalogPage({ category, page }: CatalogPageProps) {
 
   return (
     <section>
+      <div className="hero">
+        <p className="hero-title">أهلاً بك — تسوّق الآن</p>
+        <p className="hero-sub">تشكيلة مختارة من المنتجات بأسعار مناسبة وشحن سريع.</p>
+      </div>
       <h1>المنتجات</h1>
-      <p>
+      <p className="filter-bar">
         <label>
           التصنيف:{' '}
           <select
@@ -60,17 +64,19 @@ export function CatalogPage({ category, page }: CatalogPageProps) {
             {products.data.data.map((p) => (
               <li key={p.id} className="card">
                 <img src={imagePath(p.image_url)} alt={p.name} />
-                <h2>
-                  <Link to="/products/$productId" params={{ productId: p.id }}>
-                    {p.name}
-                  </Link>
-                </h2>
-                <p className="price">{formatMoney(p.price)}</p>
-                <p className="muted">{p.category.name}</p>
-                <p>
-                  <StockBadge stock={p.stock} />
-                </p>
-                {canBuy && <AddToCartButton product={p} />}
+                <div className="card-body">
+                  <h2>
+                    <Link to="/products/$productId" params={{ productId: p.id }}>
+                      {p.name}
+                    </Link>
+                  </h2>
+                  <p className="price">{formatMoney(p.price)}</p>
+                  <p className="muted">{p.category.name}</p>
+                  <p>
+                    <StockBadge stock={p.stock} />
+                  </p>
+                  {canBuy && <AddToCartButton product={p} />}
+                </div>
               </li>
             ))}
           </ul>

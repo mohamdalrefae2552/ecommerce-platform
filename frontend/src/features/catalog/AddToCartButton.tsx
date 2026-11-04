@@ -11,6 +11,7 @@ export function AddToCartButton({ product }: { readonly product: Product }) {
     <>
       <button
         type="button"
+        className="add-to-cart"
         disabled={product.stock.status === 'out_of_stock'}
         onClick={() => {
           addToCart({

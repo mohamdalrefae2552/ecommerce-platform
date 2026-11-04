@@ -3,6 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useSession } from '../../auth/session';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Pagination } from '../../components/Pagination';
+import { StatusPill } from '../../components/StatusPill';
 import { formatDate, formatMoney } from '../../lib/format';
 import { StatusChanger } from './StatusChanger';
 import { ordersQuery } from './queries';
@@ -71,7 +72,9 @@ export function OrdersPage({ page, status }: OrdersPageProps) {
                       </Link>
                     </td>
                     {isAdmin && <td>{o.user_id}</td>}
-                    <td>{statusLabels[o.status]}</td>
+                    <td>
+                      <StatusPill status={o.status} />
+                    </td>
                     <td>{formatMoney(o.total)}</td>
                     <td>{o.item_count}</td>
                     <td>{formatDate(o.created_at)}</td>

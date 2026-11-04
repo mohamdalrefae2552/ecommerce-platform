@@ -3,10 +3,10 @@ import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Pagination } from '../../components/Pagination';
+import { StatusPill } from '../../components/StatusPill';
 import { formatDate, formatMoney } from '../../lib/format';
 import { StatusChanger } from '../orders/StatusChanger';
 import { ordersQuery } from '../orders/queries';
-import { statusLabels } from '../orders/status';
 
 export function AdminOrders() {
   const [page, setPage] = useState(1);
@@ -39,7 +39,9 @@ export function AdminOrders() {
                         {o.id}
                       </Link>
                     </td>
-                    <td>{statusLabels[o.status]}</td>
+                    <td>
+                      <StatusPill status={o.status} />
+                    </td>
                     <td>{formatMoney(o.total)}</td>
                     <td>{formatDate(o.created_at)}</td>
                     <td>

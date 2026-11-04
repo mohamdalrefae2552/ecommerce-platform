@@ -5,6 +5,7 @@ import { useSession } from '../../auth/session';
 import { ProblemError } from '../../api/problem';
 import { showToast } from '../../components/toast';
 import { ErrorNotice } from '../../components/ErrorNotice';
+import { StatusPill } from '../../components/StatusPill';
 import { formatDate, formatMoney } from '../../lib/format';
 import { DemoStatusAttempt } from './DemoStatusAttempt';
 import { StatusChanger } from './StatusChanger';
@@ -60,7 +61,7 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
         )}
       </p>
       <div>
-        الحالة: <strong>{statusLabels[order.status]}</strong>{' '}
+        الحالة: <StatusPill status={order.status} />{' '}
         {isAdmin && <StatusChanger orderId={order.id} status={order.status} />}
       </div>
       {!isAdmin && <DemoStatusAttempt orderId={order.id} />}
