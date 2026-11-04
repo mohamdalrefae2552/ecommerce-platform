@@ -3,7 +3,8 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useSession } from '../../auth/session';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Pagination } from '../../components/Pagination';
-import { formatMoney, imagePath, stockText } from '../../lib/format';
+import { StockBadge } from '../../components/StockBadge';
+import { formatMoney, imagePath } from '../../lib/format';
 import { AddToCartButton } from './AddToCartButton';
 import { categoriesQuery, productsQuery } from './queries';
 
@@ -50,19 +51,25 @@ export function CatalogPage({ category, page }: CatalogPageProps) {
       {products.data !== undefined && (
         <>
           {products.data.meta.degraded?.includes('inventory') === true && (
-            <p role="alert">
+            <p role="alert" className="degraded">
               خدمة المخزون لا تستجيب حالياً؛ المنتجات معروضة دون معرفة الكميات المتوفرة.
             </p>
           )}
           {products.data.data.length === 0 && <p>لا توجد منتجات في هذا التصنيف.</p>}
-          <ul>
+          <ul className="grid">
             {products.data.data.map((p) => (
-              <li key={p.id}>
-                <img src={imagePath(p.image_url)} alt={p.name} width={96} height={96} />{' '}
-                <Link to="/products/$productId" params={{ productId: p.id }}>
-                  {p.name}
-                </Link>{' '}
-                — {formatMoney(p.price)} — {p.category.name} — {stockText(p.stock)}{' '}
+              <li key={p.id} className="card">
+                <img src={imagePath(p.image_url)} alt={p.name} />
+                <h2>
+                  <Link to="/products/$productId" params={{ productId: p.id }}>
+                    {p.name}
+                  </Link>
+                </h2>
+                <p className="price">{formatMoney(p.price)}</p>
+                <p className="muted">{p.category.name}</p>
+                <p>
+                  <StockBadge stock={p.stock} />
+                </p>
                 {canBuy && <AddToCartButton product={p} />}
               </li>
             ))}

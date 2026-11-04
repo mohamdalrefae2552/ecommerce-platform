@@ -82,7 +82,9 @@ export function StockForm({ productId }: { readonly productId: string }) {
         </button>
       </form>
       {adjust.isSuccess && (
-        <p role="status">تم التعديل. الكمية الحالية: {adjust.data.data.available}</p>
+        <p role="status" className="success">
+          تم التعديل. الكمية الحالية: {adjust.data.data.available}
+        </p>
       )}
       {adjust.error !== null && <ErrorNotice error={adjust.error} />}
     </section>

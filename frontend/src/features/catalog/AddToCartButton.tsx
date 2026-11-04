@@ -22,7 +22,12 @@ export function AddToCartButton({ product }: { readonly product: Product }) {
       >
         أضف إلى السلة
       </button>
-      {added && <span role="status"> تمت الإضافة إلى السلة.</span>}
+      {added && (
+        <span role="status" className="success">
+          {' '}
+          تمت الإضافة إلى السلة.
+        </span>
+      )}
     </>
   );
 }

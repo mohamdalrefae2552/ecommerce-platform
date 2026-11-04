@@ -50,7 +50,12 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
         >
           نسخ رقم الطلب
         </button>
-        {copied && <span role="status"> تم النسخ.</span>}
+        {copied && (
+          <span role="status" className="success">
+            {' '}
+            تم النسخ.
+          </span>
+        )}
       </p>
       <div>
         الحالة: <strong>{statusLabels[order.status]}</strong>{' '}

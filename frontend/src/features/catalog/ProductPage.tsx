@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useSession } from '../../auth/session';
 import { ErrorNotice } from '../../components/ErrorNotice';
-import { formatMoney, imagePath, stockText } from '../../lib/format';
+import { StockBadge } from '../../components/StockBadge';
+import { formatMoney, imagePath } from '../../lib/format';
 import { ConcurrencyTest } from '../orders/ConcurrencyTest';
 import { StockForm } from '../admin/StockForm';
 import { AddToCartButton } from './AddToCartButton';
@@ -24,7 +25,7 @@ export function ProductPage({ productId }: { readonly productId: string }) {
         </Link>
       </p>
       <h1>{product.name}</h1>
-      <img src={imagePath(product.image_url)} alt={product.name} width={240} height={240} />
+      <img src={imagePath(product.image_url)} alt={product.name} className="detail-img" />
       <p>{product.description}</p>
       <dl>
         <dt>السعر</dt>
@@ -32,10 +33,12 @@ export function ProductPage({ productId }: { readonly productId: string }) {
         <dt>التصنيف</dt>
         <dd>{product.category.name}</dd>
         <dt>الكمية</dt>
-        <dd>{stockText(product.stock)}</dd>
+        <dd>
+          <StockBadge stock={product.stock} />
+        </dd>
       </dl>
       {product.stock.status === 'unknown' && (
-        <p role="alert">
+        <p role="alert" className="degraded">
           تعذّر الاستعلام عن المخزون الآن؛ يمكنك المحاولة لاحقاً أو إضافة المنتج وسيتحقق الخادم من
           الكمية عند الطلب.
         </p>
