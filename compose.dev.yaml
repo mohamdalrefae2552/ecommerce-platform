@@ -1,0 +1,29 @@
+# Development-only additions, merged on top of compose.yaml by the Makefile
+# (skipped with `make up ENV=prod`).
+services:
+  mailpit:
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+
+  # Vite dev server with hot reload; /api is proxied to edge so the browser
+  # stays on one origin. Start with: docker compose --profile dev up web-dev
+  web-dev:
+    profiles: [dev]
+    build:
+      context: frontend
+      target: base
+    working_dir: /work/frontend
+    command: ["sh", "-c", "pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0 --port 5173 --strictPort"]
+    environment:
+      VITE_PROXY_TARGET: http://edge
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./frontend:/work/frontend
+      - ./contracts:/work/contracts:ro
+      - web-node-modules:/work/frontend/node_modules
+      - pnpm-store:/pnpm/store
+    depends_on:
+      edge:
+        condition: service_healthy
+    networks: [app-net]

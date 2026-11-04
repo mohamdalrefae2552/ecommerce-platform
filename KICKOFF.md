@@ -16,7 +16,7 @@
 # إنشاء المستودع ووضع الحزمة فيه
 gh repo create <org>/ecommerce-platform --public --clone   # أو --private مع GitHub Education Pro (لحماية الفرع)
 cd ecommerce-platform
-unzip ~/Downloads/claude-code-kit.zip -d .               # CLAUDE.md, KICKOFF.md, docs/, tasks/, contracts/, .claude/, .github/, apps/*/CLAUDE.md
+unzip ~/Downloads/claude-code-kit.zip -d .               # CLAUDE.md, KICKOFF.md, docs/, tasks/, contracts/, .claude/, .github/, backend/*/CLAUDE.md, frontend/CLAUDE.md
 chmod +x .claude/hooks/*.sh
 git add -A && git commit -m "chore: add project plan, contracts draft and Claude Code team kit" && git push -u origin main
 claude            # من جذر المستودع؛ عند السؤال: Trust this folder ✅ (ضروري لتفعيل .claude/agents و hooks)

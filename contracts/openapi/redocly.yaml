@@ -1,0 +1,43 @@
+# Redocly CLI lint config for the REST contract. Run by `make lint-contracts`.
+# Must pass with zero errors AND zero warnings (P0-LEAD-04).
+extends:
+  - recommended-strict # every recommended rule as an error
+
+rules:
+  operation-operationId: error
+  operation-description: error
+  operation-tag-defined: error
+  tag-description: error
+  no-ambiguous-paths: error
+  no-unused-components: error
+  component-name-unique: error
+  paths-kebab-case: error
+  # Every request/response body must show a realistic example (docs/06 section 2).
+  rule/media-type-has-example:
+    subject:
+      type: MediaType
+    assertions:
+      requireAny:
+        - example
+        - examples
+    message: Every request and response body needs an example.
+    severity: error
+  # Every parameter must show an example.
+  rule/parameter-has-example:
+    subject:
+      type: Parameter
+    assertions:
+      requireAny:
+        - example
+        - examples
+    message: Every parameter needs an example.
+    severity: error
+  # Every operation lists the generic 500 problem.
+  rule/operation-has-500:
+    subject:
+      type: Responses
+    assertions:
+      required:
+        - '500'
+    message: Every operation must document the 500 INTERNAL_ERROR problem.
+    severity: error

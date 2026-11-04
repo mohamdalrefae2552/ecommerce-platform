@@ -1,0 +1,45 @@
+# --- secrets & local config (only .env.example is committed) ---
+.env
+.env.*
+!.env.example
+backend/api/storage/keys/*
+!backend/api/storage/keys/.gitkeep
+
+# --- dependencies ---
+**/vendor/
+**/node_modules/
+.pnpm-store/
+
+# --- build output & caches ---
+**/build/
+**/.gradle/
+**/dist/
+**/coverage/
+**/.phpunit.cache/
+**/.pest/
+**/.php-cs-fixer.cache
+**/.vite/
+**/playwright-report/
+**/test-results/
+**/blob-report/
+tests/load/results/
+
+# --- logs ---
+*.log
+**/storage/logs/*
+!**/storage/logs/.gitkeep
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Claude Code local state ---
+.claude/settings.local.json
+
+# --- local caches used by make targets ---
+.cache/

@@ -1,0 +1,39 @@
+# Every version here is pinned and verified in ADR-0010. Libraries without a
+# version are managed by the Spring Boot BOM (platform(SpringBootPlugin.BOM_COORDINATES)).
+[versions]
+spring-boot = "4.1.2"
+protobuf-plugin = "0.9.6"
+spotless = "8.10.4"
+# Not 1.37.0 (ADR-0010): 1.37.0 turned JavaFormatterOptions.Style from an enum
+# into a record and Spotless 8.10.4 fails on it (NoSuchMethodError Style.valueOf).
+# 1.36.1 is the newest version Spotless 8.10.4 knows (its built-in default).
+google-java-format = "1.36.1"
+errorprone = "2.51.0"
+errorprone-plugin = "5.2.0"
+jacoco = "0.8.16"
+testcontainers = "2.0.5"
+
+[libraries]
+spring-boot-starter-grpc-server = { module = "org.springframework.boot:spring-boot-starter-grpc-server" }
+spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+postgresql = { module = "org.postgresql:postgresql" }
+
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-starter-grpc-server-test = { module = "org.springframework.boot:spring-boot-starter-grpc-server-test" }
+spring-boot-testcontainers = { module = "org.springframework.boot:spring-boot-testcontainers" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+errorprone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "errorprone" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+errorprone = { id = "net.ltgt.errorprone", version.ref = "errorprone-plugin" }

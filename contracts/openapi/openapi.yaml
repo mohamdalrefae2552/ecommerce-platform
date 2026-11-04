@@ -1,0 +1,2158 @@
+openapi: 3.1.0
+info:
+  title: E-commerce Platform API
+  version: 1.0.0
+  summary: REST API of the main application (users, products, orders, notifications).
+  description: |
+    Contract-first REST API (ADR-0002). This file is the executable contract:
+    every Laravel feature test validates its response against it and the
+    frontend types are generated from it.
+
+    Conventions (docs/02 section 1):
+    - All paths live under `/api/v1`. JSON only, except product image upload
+      (`multipart/form-data`).
+    - Field names are `snake_case`; dates are ISO-8601 UTC; ids are ULIDs.
+    - Money is `{amount_minor, currency}` — integer minor units, never floats.
+      The only currency is `SYP` (ISO 4217, 2 minor units).
+    - Lists are wrapped in `{data, meta, links}`; single resources in `{data}`.
+    - Every error is RFC 9457 `application/problem+json` with a stable `code`
+      (catalog: contracts/errors.md).
+    - Every response carries `X-Request-Id`.
+  license:
+    name: Proprietary (university coursework)
+    identifier: LicenseRef-Coursework
+servers:
+  - url: /api/v1
+    description: Same origin behind the `edge` nginx (no CORS needed).
+tags:
+  - name: Users
+    description: Registration, login, JWT access tokens and rotating refresh tokens.
+  - name: Products
+    description: Categories and the product catalogue with images.
+  - name: Orders
+    description: Order creation, viewing and status tracking.
+  - name: Notifications
+    description: In-app notifications sent to the current user.
+  - name: Health
+    description: Liveness of the API and its dependencies.
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Users]
+      operationId: registerUser
+      summary: Register a new customer account
+      description: |
+        Creates a user with role `customer`. The role can never be chosen by
+        the client: sending `role` (or any unknown field) is a 422.
+        `Location` points to `/api/v1/auth/me` (there is no public user
+        resource).
+        Rate limit: 5 per hour per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              name: Lina Haddad
+              email: lina@example.com
+              password: correct-horse-battery
+              password_confirmation: correct-horse-battery
+      responses:
+        '201':
+          description: User created.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+              example:
+                data:
+                  id: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+                  name: Lina Haddad
+                  email: lina@example.com
+                  role: customer
+                  created_at: '2026-11-01T17:41:00Z'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/login:
+    post:
+      tags: [Users]
+      operationId: loginUser
+      summary: Log in and obtain an access token
+      description: |
+        Returns a 15-minute EdDSA-signed JWT in the body and sets the opaque
+        rotating refresh token as an `HttpOnly; Secure; SameSite=Strict`
+        cookie scoped to `/api/v1/auth`. Wrong email and wrong password give
+        the same `INVALID_CREDENTIALS` answer.
+        Rate limits: 5 per minute per (email, IP) and 20 per minute per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: lina@example.com
+              password: correct-horse-battery
+      responses:
+        '200':
+          $ref: '#/components/responses/TokenIssued'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/refresh:
+    post:
+      tags: [Users]
+      operationId: refreshToken
+      summary: Rotate the refresh token and obtain a new access token
+      description: |
+        Reads the `refresh_token` cookie, revokes it and issues a new access
+        token and a new refresh cookie in the same family. Re-using a revoked
+        refresh token revokes the whole family (theft detection).
+        CSRF protection: requires `X-Requested-With: fetch` and an `Origin`
+        equal to the application URL; otherwise 403 and nothing is rotated.
+        Rate limit: 30 per minute per IP.
+      security:
+        - refreshCookie: []
+      parameters:
+        - $ref: '#/components/parameters/XRequestedWith'
+      responses:
+        '200':
+          $ref: '#/components/responses/TokenIssued'
+        '401':
+          $ref: '#/components/responses/RefreshTokenInvalid'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/logout:
+    post:
+      tags: [Users]
+      operationId: logoutUser
+      summary: Log out and revoke the refresh-token family
+      description: Clears the refresh cookie and revokes every refresh token of the current family.
+      responses:
+        '204':
+          description: Logged out. The refresh cookie is cleared.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Set-Cookie:
+              required: true
+              description: Expires the `refresh_token` cookie (`Max-Age=0`, same attributes as when it was set).
+              schema:
+                type: string
+              example: refresh_token=deleted; Max-Age=0; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Strict
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /auth/me:
+    get:
+      tags: [Users]
+      operationId: getCurrentUser
+      summary: Get the authenticated user
+      description: Returns the user identified by the access token. The role is read from the database on every request, not from the token claim.
+      responses:
+        '200':
+          description: The current user.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+              example:
+                data:
+                  id: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+                  name: Lina Haddad
+                  email: lina@example.com
+                  role: customer
+                  created_at: '2026-11-01T17:41:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /categories:
+    get:
+      tags: [Products]
+      operationId: listCategories
+      summary: List product categories
+      description: Fixed, seeded list. Not paginated.
+      security: []
+      responses:
+        '200':
+          description: All categories ordered by name.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryListEnvelope'
+              example:
+                data:
+                  - id: 01JC3Z0Y1E2C3T4R5N6C7S8A9B
+                    slug: electronics
+                    name: إلكترونيات
+                  - id: 01JC3Z0Y1B2K3S4M5N6P7Q8R9S
+                    slug: books
+                    name: كتب
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /products:
+    get:
+      tags: [Products]
+      operationId: listProducts
+      summary: List active products
+      description: |
+        Paginated, ordered by `created_at desc, id desc`. Optional filter by
+        category slug and name search. An unknown category slug is a 422 on
+        `category` (no silent fallback). Each item carries its `stock`, read
+        with ONE batched GetStock call for the whole page. When the inventory
+        does not answer in time the list still succeeds: every `stock` is
+        `unknown` and `meta.degraded` contains `inventory`.
+      security: []
+      parameters:
+        - name: category
+          in: query
+          description: Category slug.
+          required: false
+          schema:
+            type: string
+            pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+            maxLength: 64
+          example: electronics
+        - name: q
+          in: query
+          description: Case-insensitive substring search on the product name.
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: هاتف
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: One page of products.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+              example:
+                data:
+                  - id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                    name: هاتف ذكي X200
+                    description: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+                    price:
+                      amount_minor: 450000000
+                      currency: SYP
+                    category:
+                      id: 01JC3Z0Y1E2C3T4R5N6C7S8A9B
+                      slug: electronics
+                      name: إلكترونيات
+                    image_url: http://localhost:8080/storage/products/01JC40B9C8D7E6F5G4H3J2K1MN.webp
+                    stock:
+                      status: unknown
+                      available: null
+                    created_at: '2026-11-01T17:41:00Z'
+                meta:
+                  page: 1
+                  per_page: 20
+                  total: 1
+                  last_page: 1
+                links:
+                  first: http://localhost:8080/api/v1/products?page=1&per_page=20
+                  prev: null
+                  next: null
+                  last: http://localhost:8080/api/v1/products?page=1&per_page=20
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Products]
+      operationId: createProduct
+      summary: Create a product with its image (admin only)
+      description: |
+        `multipart/form-data`. The image must be JPEG, PNG or WebP (checked by
+        content, not extension), at most 2 MB and 4000x4000 px. It is
+        re-encoded to WebP (EXIF stripped), stored under a random ULID name and
+        served from `/storage/products/{ulid}.webp`. Request bodies above 3 MB
+        are rejected by `edge` with 413.
+
+        `initial_stock` (optional, default 0) is sent to the inventory service
+        with AdjustStock after the product is saved. If the inventory is down
+        the product is still created (201) with `stock.status = unknown`; the
+        admin sets the quantity later with `PUT /products/{productId}/stock`.
+        The main application never stores quantities.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateProductRequest'
+            encoding:
+              image:
+                contentType: image/jpeg, image/png, image/webp
+            example:
+              name: هاتف ذكي X200
+              description: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+              price_minor: 450000000
+              category_id: 01JC3Z0Y1E2C3T4R5N6C7S8A9B
+              initial_stock: 3
+              image: (binary)
+      responses:
+        '201':
+          description: Product created.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductEnvelope'
+              example:
+                data:
+                  id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                  name: هاتف ذكي X200
+                  description: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+                  price:
+                    amount_minor: 450000000
+                    currency: SYP
+                  category:
+                    id: 01JC3Z0Y1E2C3T4R5N6C7S8A9B
+                    slug: electronics
+                    name: إلكترونيات
+                  image_url: http://localhost:8080/storage/products/01JC40B9C8D7E6F5G4H3J2K1MN.webp
+                  stock:
+                    status: unknown
+                    available: null
+                  created_at: '2026-11-01T17:41:00Z'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /products/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    get:
+      tags: [Products]
+      operationId: getProduct
+      summary: Get one product with its current stock
+      description: |
+        Asks the inventory service for the quantity (R2-F2, GetStock with a
+        500 ms deadline). When the inventory is down or slow the page still answers 200 with
+        `stock.status = unknown` (graceful degradation). Inactive or unknown
+        products are 404.
+      security: []
+      responses:
+        '200':
+          description: The product.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductEnvelope'
+              example:
+                data:
+                  id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                  name: هاتف ذكي X200
+                  description: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+                  price:
+                    amount_minor: 450000000
+                    currency: SYP
+                  category:
+                    id: 01JC3Z0Y1E2C3T4R5N6C7S8A9B
+                    slug: electronics
+                    name: إلكترونيات
+                  image_url: http://localhost:8080/storage/products/01JC40B9C8D7E6F5G4H3J2K1MN.webp
+                  stock:
+                    status: in_stock
+                    available: 3
+                  created_at: '2026-11-01T17:41:00Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /products/{productId}/stock:
+    parameters:
+      - $ref: '#/components/parameters/ProductId'
+    put:
+      tags: [Products]
+      operationId: adjustProductStock
+      summary: Adjust the stock of a product (admin only)
+      description: |
+        Inventory management (F-4, decision D-01): forwarded to the inventory
+        service as AdjustStock — the main application never stores
+        quantities. `delta` > 0 restocks, `delta` < 0 writes stock off.
+        A write-off larger than the available quantity is 409
+        `INSUFFICIENT_STOCK` and changes nothing.
+        `Idempotency-Key` is required: the same key and body return the same
+        result without applying the delta twice (200); the same key with a
+        different body is 422 `IDEMPOTENCY_KEY_REUSED`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdjustStockRequest'
+            example:
+              delta: 10
+              note: توريد شحنة جديدة.
+      responses:
+        '200':
+          description: Stock after the adjustment (also returned for a replay).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockLevelEnvelope'
+              example:
+                data:
+                  product_id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                  available: 13
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/InsufficientStock'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/StockAdjustUnprocessable'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/InventoryUnavailable'
+
+  /orders:
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Place an order (customers only)
+      description: |
+        All lines are reserved in the inventory in one atomic call
+        (ReserveStock, 2 s deadline, total budget 3 s) before the order is
+        saved; the order is never saved without the inventory's approval
+        (R2-F1). Insufficient stock for any line is 409 with every short line
+        in `shortages` and nothing reserved (R2-E3). When the inventory is
+        down or too slow the answer is 503 within about 3 s, no order is
+        created and any possible reservation is released (R2-E2); retrying
+        with the same `Idempotency-Key` is safe. Idempotent with `Idempotency-Key`: same key and same body
+        return the same order (201 first, 200 afterwards); same key with a
+        different body is 422 `IDEMPOTENCY_KEY_REUSED`. Admins get 403.
+        Rate limit: 10 per minute per user.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            example:
+              items:
+                - product_id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                  quantity: 1
+                - product_id: 01JC40C2D3E4F5G6H7J8K9M0NP
+                  quantity: 2
+      responses:
+        '200':
+          description: Replay of an earlier request with the same `Idempotency-Key` and body; returns the existing order.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderEnvelope'
+              examples:
+                replay:
+                  $ref: '#/components/examples/PendingOrder'
+        '201':
+          description: Order created with status `pending`.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderEnvelope'
+              examples:
+                created:
+                  $ref: '#/components/examples/PendingOrder'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/InsufficientStock'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/CreateOrderUnprocessable'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/InventoryUnavailable'
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: List orders
+      description: |
+        Customers see only their own orders (restricted in SQL). Admins see
+        all orders and may filter by `user_id`; a customer sending `user_id`
+        is a 422 (prohibited, not silently ignored). Ordered by
+        `created_at desc, id desc`.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter by current status.
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+          example: pending
+        - name: user_id
+          in: query
+          required: false
+          description: Admin only. Filter by customer ULID.
+          schema:
+            $ref: '#/components/schemas/Ulid'
+          example: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: One page of orders (without items and history).
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+              example:
+                data:
+                  - id: 01JC41D4E5F6G7H8J9KAMBNCPQ
+                    user_id: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+                    status: pending
+                    total:
+                      amount_minor: 470000000
+                      currency: SYP
+                    item_count: 2
+                    created_at: '2026-11-01T17:45:00Z'
+                    updated_at: '2026-11-01T17:45:00Z'
+                meta:
+                  page: 1
+                  per_page: 20
+                  total: 1
+                  last_page: 1
+                links:
+                  first: http://localhost:8080/api/v1/orders?page=1&per_page=20
+                  prev: null
+                  next: null
+                  last: http://localhost:8080/api/v1/orders?page=1&per_page=20
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /orders/{orderId}:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Get one order with its items and status history
+      description: |
+        A customer requesting another customer's order gets **404**, exactly
+        like a non-existent order (BOLA protection, decision D-02).
+      responses:
+        '200':
+          description: The order.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderEnvelope'
+              examples:
+                pending:
+                  $ref: '#/components/examples/PendingOrder'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /orders/{orderId}/status:
+    parameters:
+      - $ref: '#/components/parameters/OrderId'
+    patch:
+      tags: [Orders]
+      operationId: changeOrderStatus
+      summary: Change the status of an order (admin only)
+      description: |
+        Allowed transitions: `pending → confirmed → shipped → delivered`, and
+        `pending|confirmed → cancelled`. Anything else is 409
+        `ORDER_INVALID_TRANSITION`. Customers — including the order's owner —
+        get **403** (decision D-02). Every change is recorded in the status
+        history with the acting admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeOrderStatusRequest'
+            example:
+              status: confirmed
+              note: تم التحقق من الدفع.
+      responses:
+        '200':
+          description: The order after the transition.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderEnvelope'
+              examples:
+                confirmed:
+                  $ref: '#/components/examples/ConfirmedOrder'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/InvalidTransition'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: List the current user's notifications
+      description: Only the caller's own notifications. Newest first.
+      parameters:
+        - name: unread
+          in: query
+          required: false
+          description: When `true`, only unread notifications.
+          schema:
+            type: boolean
+          example: true
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: One page of notifications.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationList'
+              example:
+                data:
+                  - id: 01JC42F6G7H8J9KAMBNCPQRSTV
+                    type: order.placed
+                    data:
+                      order_id: 01JC41D4E5F6G7H8J9KAMBNCPQ
+                      status: pending
+                    read_at: null
+                    created_at: '2026-11-01T17:45:01Z'
+                meta:
+                  page: 1
+                  per_page: 20
+                  total: 1
+                  last_page: 1
+                links:
+                  first: http://localhost:8080/api/v1/notifications?page=1&per_page=20
+                  prev: null
+                  next: null
+                  last: http://localhost:8080/api/v1/notifications?page=1&per_page=20
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /notifications/{notificationId}/read:
+    parameters:
+      - $ref: '#/components/parameters/NotificationId'
+    patch:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      summary: Mark one notification as read
+      description: Idempotent. Another user's notification is 404.
+      responses:
+        '200':
+          description: The notification, now read.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationEnvelope'
+              example:
+                data:
+                  id: 01JC42F6G7H8J9KAMBNCPQRSTV
+                  type: order.placed
+                  data:
+                    order_id: 01JC41D4E5F6G7H8J9KAMBNCPQ
+                    status: pending
+                  read_at: '2026-11-01T18:00:00Z'
+                  created_at: '2026-11-01T17:45:01Z'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Health of the API and its dependencies
+      description: No sensitive information. `inventory` is `degraded` when the inventory service does not answer in time.
+      security: []
+      responses:
+        '200':
+          description: The API is up.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+                checks:
+                  db: ok
+                  inventory: ok
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        EdDSA (Ed25519) signed access token, 15 minutes. Claims: iss,
+        aud=ecommerce-api, sub (user ULID), role, iat, nbf, exp, jti; `kid`
+        header. Any other `alg` (including `none`) is rejected.
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: Opaque 256-bit rotating refresh token, 14 days, `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth`.
+
+  headers:
+    XRequestId:
+      required: true
+      description: Request correlation id (ULID). Echoed from the request or generated by `edge`; also sent as `trace_id` in problems.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+      example: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    Location:
+      required: true
+      description: Absolute URL of the created resource.
+      schema:
+        type: string
+        format: uri
+      example: http://localhost:8080/api/v1/orders/01JC41D4E5F6G7H8J9KAMBNCPQ
+    RetryAfter:
+      description: Seconds to wait before retrying.
+      schema:
+        type: integer
+        minimum: 1
+      example: 42
+    RateLimitLimit:
+      description: Requests allowed in the current window.
+      schema:
+        type: integer
+        minimum: 1
+      example: 5
+    RateLimitRemaining:
+      description: Requests left in the current window.
+      schema:
+        type: integer
+        minimum: 0
+      example: 0
+    WwwAuthenticate:
+      required: true
+      description: Always `Bearer` on every 401 (RFC 9110 section 15.5.2).
+      schema:
+        type: string
+      example: Bearer
+    SetRefreshCookie:
+      required: true
+      description: The new rotating refresh token.
+      schema:
+        type: string
+      example: refresh_token=Yk3v9Q...; Max-Age=1209600; Path=/api/v1/auth; HttpOnly; Secure; SameSite=Strict
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 1-based page number. Out-of-range values are 422 (no silent clamping).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100000
+        default: 1
+      example: 1
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: Page size, 1..100. Out-of-range values are 422 (no silent clamping).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: UUID chosen by the client per checkout attempt. A non-UUID value is 400 `MALFORMED_REQUEST`.
+      schema:
+        type: string
+        format: uuid
+      example: 3f1c2a9e-6b7d-4c8e-9f10-2a3b4c5d6e7f
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID chosen by the client per adjustment. Missing or not a UUID is 400 `MALFORMED_REQUEST`.
+      schema:
+        type: string
+        format: uuid
+      example: 7b2e4c1a-9d3f-4e5a-8b6c-0d1e2f3a4b5c
+    XRequestedWith:
+      name: X-Requested-With
+      in: header
+      required: true
+      description: CSRF guard for the cookie-authenticated refresh. Must be exactly `fetch`.
+      schema:
+        type: string
+        const: fetch
+      example: fetch
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      description: Product ULID.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+      example: 01JC40A1B2C3D4E5F6G7H8J9KM
+    OrderId:
+      name: orderId
+      in: path
+      required: true
+      description: Order ULID.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+      example: 01JC41D4E5F6G7H8J9KAMBNCPQ
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      description: Notification ULID.
+      schema:
+        $ref: '#/components/schemas/Ulid'
+      example: 01JC42F6G7H8J9KAMBNCPQRSTV
+
+  responses:
+    TokenIssued:
+      description: Access token issued; a new refresh cookie is set.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Set-Cookie:
+          $ref: '#/components/headers/SetRefreshCookie'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TokenEnvelope'
+          example:
+            data:
+              access_token: eyJhbGciOiJFZERTQSIsImtpZCI6IjIwMjYtMTEiLCJ0eXAiOiJKV1QifQ.eyJzdWIiOiIwMUpDM1o4WDdRNE0yTjVQNlI3UzhUOVYwVyJ9.c2lnbmF0dXJl
+              token_type: Bearer
+              expires_in: 900
+              user:
+                id: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+                name: Lina Haddad
+                email: lina@example.com
+                role: customer
+                created_at: '2026-11-01T17:41:00Z'
+    InvalidCredentials:
+      description: Wrong email or password (`INVALID_CREDENTIALS`) — one answer for both so accounts cannot be enumerated.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WwwAuthenticate'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/invalid-credentials
+            title: Invalid credentials
+            status: 401
+            detail: البريد الإلكتروني أو كلمة المرور غير صحيحة.
+            instance: /api/v1/auth/login
+            code: INVALID_CREDENTIALS
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    RefreshTokenInvalid:
+      description: Refresh token missing, expired, revoked or re-used (`REFRESH_TOKEN_INVALID`). Re-use also revokes the whole token family.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WwwAuthenticate'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/refresh-token-invalid
+            title: Refresh token invalid
+            status: 401
+            detail: انتهت الجلسة، يرجى تسجيل الدخول من جديد.
+            instance: /api/v1/auth/refresh
+            code: REFRESH_TOKEN_INVALID
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    MalformedRequest:
+      description: Invalid JSON body or malformed header (`MALFORMED_REQUEST`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/malformed-request
+            title: Malformed request
+            status: 400
+            detail: جسم الطلب ليس JSON صالحاً.
+            instance: /api/v1/orders
+            code: MALFORMED_REQUEST
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    Unauthenticated:
+      description: Missing or invalid access token (`UNAUTHENTICATED`) or expired token (`TOKEN_EXPIRED`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        WWW-Authenticate:
+          $ref: '#/components/headers/WwwAuthenticate'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            unauthenticated:
+              summary: No token, bad signature, wrong alg/iss/aud, unknown kid or disabled user
+              value:
+                type: https://ecommerce.local/problems/unauthenticated
+                title: Unauthenticated
+                status: 401
+                detail: يجب تسجيل الدخول للوصول إلى هذا المورد.
+                instance: /api/v1/orders
+                code: UNAUTHENTICATED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+            expired:
+              summary: Token expired; the client should call /auth/refresh
+              value:
+                type: https://ecommerce.local/problems/token-expired
+                title: Token expired
+                status: 401
+                detail: انتهت صلاحية رمز الدخول.
+                instance: /api/v1/orders
+                code: TOKEN_EXPIRED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    Forbidden:
+      description: The caller's role may not perform this operation, or the CSRF guard failed (`FORBIDDEN`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/forbidden
+            title: Forbidden
+            status: 403
+            detail: ليس لديك صلاحية لتنفيذ هذه العملية.
+            instance: /api/v1/orders/01JC41D4E5F6G7H8J9KAMBNCPQ/status
+            code: FORBIDDEN
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    NotFound:
+      description: The resource does not exist or the caller may not see it (`NOT_FOUND`, decision D-02).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/not-found
+            title: Not found
+            status: 404
+            detail: المورد المطلوب غير موجود.
+            instance: /api/v1/orders/01JC41D4E5F6G7H8J9KAMBNCPQ
+            code: NOT_FOUND
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    InvalidTransition:
+      description: The requested status is not reachable from the current one (`ORDER_INVALID_TRANSITION`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/order-invalid-transition
+            title: Invalid order status transition
+            status: 409
+            detail: لا يمكن نقل الطلب من الحالة delivered إلى pending.
+            instance: /api/v1/orders/01JC41D4E5F6G7H8J9KAMBNCPQ/status
+            code: ORDER_INVALID_TRANSITION
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    PayloadTooLarge:
+      description: Request body above 3 MB, rejected by `edge` (`PAYLOAD_TOO_LARGE`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/payload-too-large
+            title: Payload too large
+            status: 413
+            detail: حجم الطلب أكبر من المسموح.
+            instance: /api/v1/products
+            code: PAYLOAD_TOO_LARGE
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    UnsupportedMediaType:
+      description: The request `Content-Type` is not accepted by this operation (`UNSUPPORTED_MEDIA_TYPE`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/unsupported-media-type
+            title: Unsupported media type
+            status: 415
+            detail: نوع المحتوى غير مدعوم.
+            instance: /api/v1/orders
+            code: UNSUPPORTED_MEDIA_TYPE
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    ValidationFailed:
+      description: Input validation failed (`VALIDATION_FAILED`, with `errors`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            validation:
+              summary: Field errors
+              value:
+                type: https://ecommerce.local/problems/validation-failed
+                title: Validation failed
+                status: 422
+                detail: البيانات المرسلة غير صالحة.
+                instance: /api/v1/products
+                code: VALIDATION_FAILED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+                errors:
+                  per_page:
+                    - يجب أن تكون قيمة per_page بين 1 و 100.
+    CreateOrderUnprocessable:
+      description: Input validation failed (`VALIDATION_FAILED`) or the `Idempotency-Key` was re-used with a different body (`IDEMPOTENCY_KEY_REUSED`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/ValidationProblem'
+              - $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: Unknown or inactive product
+              value:
+                type: https://ecommerce.local/problems/validation-failed
+                title: Validation failed
+                status: 422
+                detail: البيانات المرسلة غير صالحة.
+                instance: /api/v1/orders
+                code: VALIDATION_FAILED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+                errors:
+                  items.0.product_id:
+                    - المنتج غير موجود أو غير متاح.
+            idempotencyReused:
+              summary: Same Idempotency-Key with a different body
+              value:
+                type: https://ecommerce.local/problems/idempotency-key-reused
+                title: Idempotency key reused
+                status: 422
+                detail: استُخدم مفتاح التكرار نفسه مع طلب مختلف.
+                instance: /api/v1/orders
+                code: IDEMPOTENCY_KEY_REUSED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    RateLimited:
+      description: Too many requests (`RATE_LIMITED`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/RateLimitLimit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/RateLimitRemaining'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/RateLimitedProblem'
+          example:
+            type: https://ecommerce.local/problems/rate-limited
+            title: Too many requests
+            status: 429
+            detail: محاولات كثيرة، حاول بعد 42 ثانية.
+            instance: /api/v1/auth/login
+            code: RATE_LIMITED
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+            retry_after: 42
+    InsufficientStock:
+      description: The inventory does not have enough units (`INSUFFICIENT_STOCK`). Nothing was reserved or changed.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/InsufficientStockProblem'
+          example:
+            type: https://ecommerce.local/problems/insufficient-stock
+            title: Insufficient stock
+            status: 409
+            detail: الكمية المتوفرة غير كافية لبعض المنتجات.
+            instance: /api/v1/orders
+            code: INSUFFICIENT_STOCK
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+            shortages:
+              - product_id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                requested: 2
+                available: 1
+    InventoryUnavailable:
+      description: The inventory service is down (`INVENTORY_UNAVAILABLE`) or did not answer before the deadline (`INVENTORY_TIMEOUT`). Nothing was created or changed.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/RetryableProblem'
+          examples:
+            unavailable:
+              summary: Inventory service down
+              value:
+                type: https://ecommerce.local/problems/inventory-unavailable
+                title: Inventory unavailable
+                status: 503
+                detail: خدمة المخزون غير متاحة حالياً، لم يُنشأ طلبك. حاول بعد 5 ثوانٍ.
+                instance: /api/v1/orders
+                code: INVENTORY_UNAVAILABLE
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+                retry_after: 5
+            timeout:
+              summary: Inventory service too slow
+              value:
+                type: https://ecommerce.local/problems/inventory-timeout
+                title: Inventory timeout
+                status: 503
+                detail: خدمة المخزون لم تستجب في الوقت المحدد، لم يُنشأ طلبك. حاول بعد 5 ثوانٍ.
+                instance: /api/v1/orders
+                code: INVENTORY_TIMEOUT
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+                retry_after: 5
+    StockAdjustUnprocessable:
+      description: Invalid adjustment (`VALIDATION_FAILED`) or the `Idempotency-Key` was re-used with a different body (`IDEMPOTENCY_KEY_REUSED`).
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/ValidationProblem'
+              - $ref: '#/components/schemas/Problem'
+          examples:
+            validation:
+              summary: delta is zero
+              value:
+                type: https://ecommerce.local/problems/validation-failed
+                title: Validation failed
+                status: 422
+                detail: البيانات المرسلة غير صالحة.
+                instance: /api/v1/products/01JC40A1B2C3D4E5F6G7H8J9KM/stock
+                code: VALIDATION_FAILED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+                errors:
+                  delta:
+                    - يجب ألا تساوي الكمية صفراً.
+            idempotencyReused:
+              summary: Same Idempotency-Key with a different body
+              value:
+                type: https://ecommerce.local/problems/idempotency-key-reused
+                title: Idempotency key reused
+                status: 422
+                detail: استُخدم مفتاح التكرار نفسه مع طلب مختلف.
+                instance: /api/v1/products/01JC40A1B2C3D4E5F6G7H8J9KM/stock
+                code: IDEMPOTENCY_KEY_REUSED
+                trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    InternalError:
+      description: Unexpected server error (`INTERNAL_ERROR`). Never contains traces, SQL or file paths.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/XRequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: https://ecommerce.local/problems/internal-error
+            title: Internal server error
+            status: 500
+            detail: حدث خطأ غير متوقع، حاول لاحقاً.
+            instance: /api/v1/orders
+            code: INTERNAL_ERROR
+            trace_id: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+
+  examples:
+    PendingOrder:
+      summary: A freshly placed order
+      value:
+        data:
+          id: 01JC41D4E5F6G7H8J9KAMBNCPQ
+          user_id: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+          status: pending
+          items:
+            - product_id: 01JC40A1B2C3D4E5F6G7H8J9KM
+              product_name: هاتف ذكي X200
+              unit_price:
+                amount_minor: 450000000
+                currency: SYP
+              quantity: 1
+              line_total:
+                amount_minor: 450000000
+                currency: SYP
+            - product_id: 01JC40C2D3E4F5G6H7J8K9M0NP
+              product_name: غطاء حماية
+              unit_price:
+                amount_minor: 10000000
+                currency: SYP
+              quantity: 2
+              line_total:
+                amount_minor: 20000000
+                currency: SYP
+          total:
+            amount_minor: 470000000
+            currency: SYP
+          status_history:
+            - from: null
+              to: pending
+              actor_role: customer
+              note: null
+              at: '2026-11-01T17:45:00Z'
+          created_at: '2026-11-01T17:45:00Z'
+          updated_at: '2026-11-01T17:45:00Z'
+    ConfirmedOrder:
+      summary: The same order after an admin confirmed it
+      value:
+        data:
+          id: 01JC41D4E5F6G7H8J9KAMBNCPQ
+          user_id: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+          status: confirmed
+          items:
+            - product_id: 01JC40A1B2C3D4E5F6G7H8J9KM
+              product_name: هاتف ذكي X200
+              unit_price:
+                amount_minor: 450000000
+                currency: SYP
+              quantity: 1
+              line_total:
+                amount_minor: 450000000
+                currency: SYP
+          total:
+            amount_minor: 450000000
+            currency: SYP
+          status_history:
+            - from: null
+              to: pending
+              actor_role: customer
+              note: null
+              at: '2026-11-01T17:45:00Z'
+            - from: pending
+              to: confirmed
+              actor_role: admin
+              note: تم التحقق من الدفع.
+              at: '2026-11-01T18:10:00Z'
+          created_at: '2026-11-01T17:45:00Z'
+          updated_at: '2026-11-01T18:10:00Z'
+
+  schemas:
+    Ulid:
+      type: string
+      description: ULID (26 characters, Crockford base32, upper case).
+      pattern: '^[0-7][0-9A-HJKMNP-TV-Z]{25}$'
+      minLength: 26
+      maxLength: 26
+      example: 01JC3Z8X7Q4M2N5P6R7S8T9V0W
+    Timestamp:
+      type: string
+      format: date-time
+      description: ISO-8601 UTC timestamp.
+      example: '2026-11-01T17:41:00Z'
+    Currency:
+      type: string
+      description: ISO 4217 code. The store sells in Syrian pounds only.
+      enum: [SYP]
+      example: SYP
+    Money:
+      type: object
+      description: Amount in minor units (1 SYP = 100 minor units). Never a float.
+      required: [amount_minor, currency]
+      additionalProperties: false
+      properties:
+        amount_minor:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 450000000
+        currency:
+          $ref: '#/components/schemas/Currency'
+    Role:
+      type: string
+      description: '`customer` is the default on registration; `admin` is created only by `php artisan app:create-admin`.'
+      enum: [customer, admin]
+      example: customer
+    User:
+      type: object
+      required: [id, name, email, role, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Lina Haddad
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: lina@example.com
+        role:
+          $ref: '#/components/schemas/Role'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+    UserEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      description: Unknown fields are rejected with 422 (docs/04 section 6), so sending `role` can never grant a role.
+      required: [name, email, password, password_confirmation]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Lina Haddad
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Stored lower-cased; must be unique.
+          example: lina@example.com
+        password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+          example: correct-horse-battery
+        password_confirmation:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+          example: correct-horse-battery
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: lina@example.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 128
+          example: correct-horse-battery
+    Token:
+      type: object
+      required: [access_token, token_type, expires_in, user]
+      additionalProperties: false
+      properties:
+        access_token:
+          type: string
+          description: EdDSA-signed JWT. Keep it in memory only (never localStorage).
+          example: eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiIwMUpDM1oifQ.c2ln
+        token_type:
+          type: string
+          const: Bearer
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Lifetime in seconds.
+          const: 900
+          example: 900
+        user:
+          $ref: '#/components/schemas/User'
+    TokenEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Token'
+
+    Category:
+      type: object
+      required: [id, slug, name]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        slug:
+          type: string
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          maxLength: 64
+          example: electronics
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: إلكترونيات
+    CategoryListEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Category'
+    Stock:
+      type: object
+      description: |
+        Stock as reported by the inventory service. `unknown` with
+        `available: null` when the inventory is down or slower than its 500 ms
+        deadline — the product response still succeeds.
+      required: [status, available]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [in_stock, out_of_stock, unknown]
+          example: in_stock
+        available:
+          type: [integer, 'null']
+          format: int64
+          minimum: 0
+          example: 3
+    Product:
+      type: object
+      required: [id, name, description, price, category, image_url, stock, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+          example: هاتف ذكي X200
+        description:
+          type: string
+          maxLength: 2000
+          example: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+        price:
+          $ref: '#/components/schemas/Money'
+        category:
+          $ref: '#/components/schemas/Category'
+        image_url:
+          type: string
+          format: uri
+          description: Absolute URL of the re-encoded WebP image.
+          example: http://localhost:8080/storage/products/01JC40B9C8D7E6F5G4H3J2K1MN.webp
+        stock:
+          $ref: '#/components/schemas/Stock'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+    ProductEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Product'
+    CreateProductRequest:
+      type: object
+      additionalProperties: false
+      required: [name, price_minor, category_id, image]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+          example: هاتف ذكي X200
+        description:
+          type: string
+          maxLength: 2000
+          description: Optional; stored as an empty string when omitted.
+          example: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+        price_minor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 100000000000
+          description: Price in SYP minor units.
+          example: 450000000
+        category_id:
+          $ref: '#/components/schemas/Ulid'
+        initial_stock:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 1000000
+          default: 0
+          description: Units to register in the inventory service; 0 registers nothing.
+          example: 3
+        image:
+          type: string
+          contentMediaType: application/octet-stream
+          description: JPEG, PNG or WebP; at most 2 MB and 4000x4000 px.
+    AdjustStockRequest:
+      type: object
+      additionalProperties: false
+      required: [delta]
+      properties:
+        delta:
+          type: integer
+          format: int64
+          minimum: -1000000
+          maximum: 1000000
+          not:
+            const: 0
+          description: Positive = restock, negative = write-off. Never 0.
+          example: 10
+        note:
+          type: string
+          maxLength: 200
+          description: Short audit note.
+          example: توريد شحنة جديدة.
+    StockLevel:
+      type: object
+      required: [product_id, available]
+      additionalProperties: false
+      properties:
+        product_id:
+          $ref: '#/components/schemas/Ulid'
+        available:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 13
+    StockLevelEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/StockLevel'
+    ProductList:
+      type: object
+      required: [data, meta, links]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Product'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+        links:
+          $ref: '#/components/schemas/PaginationLinks'
+
+    OrderStatus:
+      type: string
+      description: |
+        State machine: pending → confirmed → shipped → delivered;
+        pending|confirmed → cancelled. Any other transition is 409.
+      enum: [pending, confirmed, shipped, delivered, cancelled]
+      example: pending
+    OrderItem:
+      type: object
+      description: Snapshot of the product name and price at order time.
+      required: [product_id, product_name, unit_price, quantity, line_total]
+      additionalProperties: false
+      properties:
+        product_id:
+          $ref: '#/components/schemas/Ulid'
+        product_name:
+          type: string
+          example: هاتف ذكي X200
+        unit_price:
+          $ref: '#/components/schemas/Money'
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 1
+        line_total:
+          $ref: '#/components/schemas/Money'
+    OrderStatusHistoryEntry:
+      type: object
+      required: [from, to, actor_role, note, at]
+      additionalProperties: false
+      properties:
+        from:
+          description: Previous status; `null` for the initial `pending` entry.
+          oneOf:
+            - $ref: '#/components/schemas/OrderStatus'
+            - type: 'null'
+        to:
+          $ref: '#/components/schemas/OrderStatus'
+        actor_role:
+          description: Role of whoever made the change. The actor id is stored for audit but never exposed (OWASP API3).
+          $ref: '#/components/schemas/Role'
+        note:
+          type: [string, 'null']
+          maxLength: 500
+          example: تم التحقق من الدفع.
+        at:
+          $ref: '#/components/schemas/Timestamp'
+    Order:
+      type: object
+      required: [id, user_id, status, items, total, status_history, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        user_id:
+          $ref: '#/components/schemas/Ulid'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total:
+          $ref: '#/components/schemas/Money'
+        status_history:
+          type: array
+          description: Oldest first.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderStatusHistoryEntry'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+    OrderEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Order'
+    OrderSummary:
+      type: object
+      required: [id, user_id, status, total, item_count, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        user_id:
+          $ref: '#/components/schemas/Ulid'
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        total:
+          $ref: '#/components/schemas/Money'
+        item_count:
+          type: integer
+          minimum: 1
+          maximum: 20
+          example: 2
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        updated_at:
+          $ref: '#/components/schemas/Timestamp'
+    OrderList:
+      type: object
+      required: [data, meta, links]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+        links:
+          $ref: '#/components/schemas/PaginationLinks'
+    CreateOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          description: 1..20 lines. Each product may appear at most once; the server enforces it (`distinct` on `items.*.product_id` → 422) because `uniqueItems` only compares whole objects.
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id, quantity]
+            properties:
+              product_id:
+                $ref: '#/components/schemas/Ulid'
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 100
+                example: 1
+    ChangeOrderStatusRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        note:
+          type: string
+          maxLength: 500
+          example: تم التحقق من الدفع.
+
+    NotificationType:
+      type: string
+      enum: [order.placed, order.status_changed]
+      example: order.placed
+    Notification:
+      type: object
+      required: [id, type, data, read_at, created_at]
+      additionalProperties: false
+      properties:
+        id:
+          $ref: '#/components/schemas/Ulid'
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        data:
+          type: object
+          required: [order_id, status]
+          additionalProperties: false
+          properties:
+            order_id:
+              $ref: '#/components/schemas/Ulid'
+            status:
+              $ref: '#/components/schemas/OrderStatus'
+        read_at:
+          oneOf:
+            - $ref: '#/components/schemas/Timestamp'
+            - type: 'null'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+    NotificationEnvelope:
+      type: object
+      required: [data]
+      additionalProperties: false
+      properties:
+        data:
+          $ref: '#/components/schemas/Notification'
+    NotificationList:
+      type: object
+      required: [data, meta, links]
+      additionalProperties: false
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+        links:
+          $ref: '#/components/schemas/PaginationLinks'
+
+    PaginationMeta:
+      type: object
+      required: [page, per_page, total, last_page]
+      additionalProperties: false
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          example: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 20
+        total:
+          type: integer
+          minimum: 0
+          example: 57
+        last_page:
+          type: integer
+          minimum: 1
+          example: 3
+        degraded:
+          type: array
+          description: Dependencies that did not answer in time; their fields hold fallback values (e.g. `stock.status = unknown`). Absent when everything answered.
+          uniqueItems: true
+          minItems: 1
+          items:
+            type: string
+            enum: [inventory]
+          example: [inventory]
+    PaginationLinks:
+      type: object
+      required: [first, prev, next, last]
+      additionalProperties: false
+      properties:
+        first:
+          type: string
+          format: uri
+          example: http://localhost:8080/api/v1/products?page=1&per_page=20
+        prev:
+          type: [string, 'null']
+          format: uri
+          example: null
+        next:
+          type: [string, 'null']
+          format: uri
+          example: http://localhost:8080/api/v1/products?page=2&per_page=20
+        last:
+          type: string
+          format: uri
+          example: http://localhost:8080/api/v1/products?page=3&per_page=20
+
+    Health:
+      type: object
+      required: [status, checks]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          const: ok
+          example: ok
+        checks:
+          type: object
+          required: [db, inventory]
+          additionalProperties: false
+          properties:
+            db:
+              type: string
+              description: The application database answered. When it does not, the endpoint fails with 500.
+              const: ok
+              example: ok
+            inventory:
+              type: string
+              enum: [ok, degraded]
+              example: ok
+
+    ProblemCode:
+      type: string
+      description: Stable machine-readable error code (catalog in contracts/errors.md).
+      enum:
+        - MALFORMED_REQUEST
+        - UNAUTHENTICATED
+        - TOKEN_EXPIRED
+        - INVALID_CREDENTIALS
+        - REFRESH_TOKEN_INVALID
+        - FORBIDDEN
+        - NOT_FOUND
+        - METHOD_NOT_ALLOWED
+        - INSUFFICIENT_STOCK
+        - ORDER_INVALID_TRANSITION
+        - PAYLOAD_TOO_LARGE
+        - UNSUPPORTED_MEDIA_TYPE
+        - VALIDATION_FAILED
+        - IDEMPOTENCY_KEY_REUSED
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - INVENTORY_UNAVAILABLE
+        - INVENTORY_TIMEOUT
+      example: NOT_FOUND
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details with project extensions `code` and `trace_id`.
+      required: [type, title, status, code, trace_id]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: '`https://ecommerce.local/problems/<kebab-case code>`.'
+          example: https://ecommerce.local/problems/not-found
+        title:
+          type: string
+          description: Short English summary, constant per code.
+          example: Not found
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          example: 404
+        detail:
+          type: string
+          description: Arabic, human-readable explanation for the end user.
+          example: المورد المطلوب غير موجود.
+        instance:
+          type: string
+          description: Request path that produced the problem.
+          example: /api/v1/orders/01JC41D4E5F6G7H8J9KAMBNCPQ
+        code:
+          $ref: '#/components/schemas/ProblemCode'
+        trace_id:
+          type: string
+          description: Same value as the `X-Request-Id` response header.
+          example: 01JC3Z9A1B2C3D4E5F6G7H8J9K
+    ValidationProblem:
+      description: '422 `VALIDATION_FAILED` problem; `errors` is always present.'
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              description: Field name (dot notation for nested, e.g. `items.0.product_id`) → messages.
+              additionalProperties:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+              example:
+                email:
+                  - البريد الإلكتروني مستخدم مسبقاً.
+    Shortage:
+      type: object
+      required: [product_id, requested, available]
+      additionalProperties: false
+      properties:
+        product_id:
+          $ref: '#/components/schemas/Ulid'
+        requested:
+          type: integer
+          minimum: 1
+          description: Units the request needed (for a stock write-off, the units to remove).
+          example: 2
+        available:
+          type: integer
+          format: int64
+          minimum: 0
+          example: 1
+    InsufficientStockProblem:
+      description: 409 `INSUFFICIENT_STOCK` problem listing every short line, ordered by product id.
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [shortages]
+          properties:
+            shortages:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/Shortage'
+    RetryableProblem:
+      description: 503 problem with the wait time in seconds (same as `Retry-After`).
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [retry_after]
+          properties:
+            retry_after:
+              type: integer
+              minimum: 1
+              example: 5
+    RateLimitedProblem:
+      description: 429 problem with the wait time in seconds (same as `Retry-After`).
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [retry_after]
+          properties:
+            retry_after:
+              type: integer
+              minimum: 1
+              example: 42

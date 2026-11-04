@@ -9,7 +9,7 @@
 - المالك: Lead · العضو: B · الفرع: `chore/p0-platform` · يعتمد على: —
 - النطاق: `.gitignore`, `.editorconfig`, `.gitattributes`, `README.md`, `Makefile`, `.env.example`, `.github/pull_request_template.md` (موجود في الحزمة)، `.github/CODEOWNERS` (اختياري).
 - الخطوات:
-  1. `.gitignore` يغطي: `.env`, `**/vendor`, `**/node_modules`, `**/build`, `**/.gradle`, `apps/api/storage/keys/*`, `*.log`, ملفات IDE.
+  1. `.gitignore` يغطي: `.env`, `**/vendor`, `**/node_modules`, `**/build`, `**/.gradle`, `backend/api/storage/keys/*`, `*.log`, ملفات IDE.
   2. `Makefile` بكل الأهداف المذكورة في `CLAUDE.md` §5 (تنفيذاً حقيقياً لا placeholders؛ الأهداف التي تعتمد على مكونات غير جاهزة بعد تطبع رسالة واضحة وتخرج بـ 1).
      - `PROJECT ?= $(notdir $(CURDIR))` ⇒ `COMPOSE := docker compose -p $(PROJECT)` لدعم worktrees متعددة.
      - `make wt NAME BRANCH MEMBER_NAME MEMBER_EMAIL` و `make wt-rm NAME` كما في `docs/07` §4.
@@ -34,7 +34,8 @@
 - المالك: Lead · العضو: A · الفرع: `chore/p0-contracts` · يعتمد على: P0-LEAD-02
 - النطاق: `contracts/openapi/openapi.yaml` (+ تقسيم اختياري في `paths/`, `components/` مع `$ref`)، `contracts/openapi/redocly.yaml`، `contracts/errors.md`.
 - الخطوات: حوّل `docs/02` حرفياً إلى OpenAPI: كل مسار، كل معامل بحدوده (`minimum/maximum/maxItems/pattern`)، `securitySchemes.bearerAuth` (JWT)، كوكي refresh، كل الردود الممكنة لكل عملية (بما فيها 401/403/404/422/429/503) عبر `components/responses` تشير لـ `Problem` (+ `ValidationProblem`, `InsufficientStockProblem`, `RateLimitedProblem`)، أمثلة واقعية لكل طلب/رد، `operationId` بصيغة camelCase، tags بأسماء الوحدات.
-- معايير القبول: `redocly lint` بلا أخطاء ولا تحذيرات؛ كل endpoint في `docs/02` §4 موجود (قائمة مطابقة في وصف الـ PR)؛ يعرض في Swagger UI دون أخطاء.
+- معايير القبول: `redocly lint` بلا أخطاء ولا تحذيرات؛ كل endpoint في `docs/02` §4 الخاص بالمتطلب 1 موجود (قائمة مطابقة في وصف الـ PR)؛ يعرض في Swagger UI دون أخطاء.
+- **مؤجّل إلى P2-LEAD-01 (إضافة غير كاسرة، phase-1 P1-API-05):** `initial_stock`، `PUT /products/{id}/stock`، ردود 409 `INSUFFICIENT_STOCK` و 503 على `POST /orders`، `InsufficientStockProblem`، `meta.degraded`. الرموز نفسها موجودة في `ProblemCode` منذ الآن.
 
 ### P0-LEAD-05 · PR العقود
 - المالك: Lead · العضو: A (يفتح) / B (يراجع) · الفرع: `chore/p0-contracts` · يعتمد على: P0-LEAD-02..04
@@ -45,7 +46,7 @@
 
 ### P0-LEAD-06 · Docker Compose + nginx + أدوات
 - المالك: Lead · العضو: B · الفرع: `chore/p0-platform` · يعتمد على: P0-LEAD-05
-- النطاق: `compose.yaml`, `compose.dev.yaml`, `infra/nginx/**`, `infra/protoc/Dockerfile`, `infra/toolbox/Dockerfile`, `infra/toxiproxy/toxiproxy.json`.
+- النطاق: `compose.yaml`, `compose.dev.yaml`, `infra/nginx/**`, `infra/toolbox/Dockerfile`, `infra/toxiproxy/toxiproxy.json`.
 - الخطوات: كل الخدمات في `docs/01` §2 بالشبكتين المعزولتين؛ healthchecks حقيقية لكل خدمة و `depends_on: condition: service_healthy`؛ `restart: unless-stopped`؛ volumes مسماة؛ لا منفذ منشور إلا `edge` (`${EDGE_PORT:-8080}`) و mailpit UI في dev؛ nginx: `/api` → php-fpm، `/storage` → volume الصور، `/docs` → swagger، `/` → SPA مع fallback لـ `index.html`، ترويسات أمان الواجهة (`docs/04` §4)، `server_tokens off`، `client_max_body_size 3m`، توليد `X-Request-Id` إن غاب؛ صفحات خطأ nginx لمسارات `/api` (413، 502، 504) تُعاد كـ `application/problem+json` بنفس صيغة العقد عبر `error_page` + `location` داخلي (لا HTML أبداً على `/api`)؛ Toxiproxy يُهيأ عند الإقلاع بـ proxy `inventory`.
 - معايير القبول: `make up` ⇒ `make ps` يعرض الكل healthy خلال ≤ 120s على جهاز نظيف (بعد البناء)؛ `docker compose exec api getent hosts db-inventory` يفشل (العزل)؛ `curl -sI localhost:8080` يعرض ترويسات الأمان.
 
@@ -57,7 +58,7 @@
 
 ### P0-API-01 · هيكل Laravel 13
 - المالك: laravel-engineer · العضو: A · الفرع: `chore/p0-api-skeleton` · يعتمد على: P0-LEAD-05
-- النطاق: `apps/api/**`.
+- النطاق: `backend/api/**`.
 - الخطوات:
   1. Laravel 13 API-only (`install:api` بلا Sanctum)، PHP 8.4.
   2. `Dockerfile` متعدد المراحل: `php:8.4-fpm` + `install-php-extensions grpc pdo_pgsql sodium opcache intl gd` (أو imagick)، مستخدم غير root، `expose_php=Off`، opcache للإنتاج، `pm.max_children` قابل للضبط بمتغير (افتراضي 16)؛ مرحلة `test`.
@@ -71,13 +72,13 @@
 
 ### P0-INV-01 · هيكل Spring Boot 4.1
 - المالك: spring-engineer · العضو: B · الفرع: `chore/p0-inventory-skeleton` · يعتمد على: P0-LEAD-05
-- النطاق: `services/inventory/**`.
-- الخطوات: Java 25 toolchain، Gradle Kotlin DSL + version catalog، `spring-boot-starter-grpc-server` + `-test`، JDBC + Flyway + Postgres driver، Actuator (منفذ إدارة داخلي)، protobuf plugin يقرأ `../../contracts/proto`، Spotless (google-java-format)، ErrorProne، JaCoCo بعتبة 85% (مفعّلة لاحقاً حين يوجد كود)، Testcontainers؛ تنفيذ `InventoryService` يعيد `UNIMPLEMENTED` مؤقتاً **فقط في هذه المهمة**؛ gRPC health + reflection؛ graceful shutdown؛ JSON logging + `RequestIdServerInterceptor`؛ Dockerfile متعدد المراحل (JRE 25، غير root، layered jar).
+- النطاق: `backend/inventory/**`.
+- الخطوات: Java 25 toolchain، Gradle Kotlin DSL + version catalog، `spring-boot-starter-grpc-server` + `spring-boot-starter-grpc-server-test`، JDBC + Flyway + Postgres driver، Actuator (منفذ إدارة داخلي)، protobuf plugin يقرأ `../../contracts/proto`، Spotless (google-java-format)، ErrorProne، JaCoCo بعتبة 85% (مفعّلة لاحقاً حين يوجد كود)، Testcontainers؛ تنفيذ `InventoryService` يعيد `UNIMPLEMENTED` مؤقتاً **فقط في هذه المهمة**؛ gRPC health + reflection؛ graceful shutdown؛ JSON logging + `RequestIdServerInterceptor`؛ Dockerfile متعدد المراحل (JRE 25، غير root، layered jar).
 - معايير القبول: `make verify-inventory` أخضر؛ `grpcurl -plaintext inventory:9090 list` من `toolbox` يعرض `inventory.v1.InventoryService` و health؛ اختبار يتحقق أن الخادم يقلع مع Testcontainers.
 
 ### P0-WEB-01 · هيكل React
 - المالك: react-engineer · العضو: B · الفرع: `chore/p0-web-skeleton` · يعتمد على: P0-LEAD-05
-- النطاق: `apps/web/**`.
+- النطاق: `frontend/**`.
 - الخطوات: Vite 8 + React 19 + TS strict (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`)، pnpm، ESLint (flat config + typescript-eslint strict + react-hooks)، Prettier، TanStack Router (file-based) + Query، `openapi-typescript` ⇒ `src/api/schema.d.ts` (عبر `make gen`)، `src/api/client.ts` (openapi-fetch + middleware: Authorization، `X-Request-Id`، تحويل الأخطاء إلى `ProblemError` typed)، MSW handlers أساسية، `dir="rtl"` و `lang="ar"`، Vitest + Testing Library، Playwright مثبت (الاختبارات عند QA)، Dockerfile لبناء static يُنسخ إلى `edge`.
 - معايير القبول: `make verify-web` أخضر (lint + tsc + vitest + build)؛ تغيير حقل في العقد ثم `make gen` ⇒ tsc يفشل حيث يُستخدم (اختبره ثم أرجعه).
 

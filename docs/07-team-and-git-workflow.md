@@ -8,11 +8,11 @@
 flowchart TB
   H[العضو المناوب A أو B] <--> L[Lead<br/>الجلسة الرئيسية]
   subgraph BE[فريق Backend]
-    LE[laravel-engineer<br/>apps/api]
-    SE[spring-engineer<br/>services/inventory]
+    LE[laravel-engineer<br/>backend/api]
+    SE[spring-engineer<br/>backend/inventory]
   end
   subgraph FQ[فريق Frontend & Quality]
-    RE[react-engineer<br/>apps/web]
+    RE[react-engineer<br/>frontend]
     QA[qa-security-engineer<br/>tests/*]
   end
   L --> LE & SE & RE & QA
@@ -26,9 +26,9 @@ flowchart TB
 | الوكيل | يملك | لا يلمس | يتواصل مع |
 |---|---|---|---|
 | Lead | `contracts/` `docs/` `tasks/` `infra/` `compose*.yaml` `Makefile` `.github/` `CLAUDE.md` | كود المكوّنات | الكل + الإنسان |
-| laravel-engineer | `apps/api/**` (عدا `generated/`) | العقود | spring (دلالات gRPC)، react (سلوك API) |
-| spring-engineer | `services/inventory/**` | العقود | laravel |
-| react-engineer | `apps/web/**` (عدا `src/api/schema.d.ts`) | العقود | laravel |
+| laravel-engineer | `backend/api/**` (عدا `generated/`) | العقود | spring (دلالات gRPC)، react (سلوك API) |
+| spring-engineer | `backend/inventory/**` | العقود | laravel |
+| react-engineer | `frontend/**` (عدا `src/api/schema.d.ts`) | العقود | laravel |
 | qa-security-engineer | `tests/e2e/` `tests/load/` `tests/security/` | كود الإنتاج (يبلّغ عن العيوب فقط) | الكل |
 | code-reviewer (subagent) | — قراءة فقط | كل شيء | Lead |
 
@@ -50,20 +50,13 @@ blocking: P2-API-06
 | `[BLOCKED]` | متوقف على شيء + ما جرّبته |
 لا يُقبل "تم" دون أوامر تحقق قابلة للتشغيل.
 
-## 4. Worktrees (منع تعارض الملفات وفصل الفروع)
-وكلاء الفريق يتشاركون نظام الملفات؛ تعديل نفس الملف من وكيلين = كتابة فوق بعض. لذلك:
-- **كل وكيل منفّذ في worktree خاص على فرع مهمته:**
-  ```bash
-  make wt NAME=api   BRANCH=feat/r1-auth-jwt         # ⇒ ../<repo>-wt/api
-  make wt NAME=inv   BRANCH=feat/r2-inventory-core   # ⇒ ../<repo>-wt/inv
-  make wt NAME=web   BRANCH=feat/r1-web-auth
-  make wt NAME=qa    BRANCH=test/r1-security-proofs
-  ```
-- `make wt` (يكتبه الـ Lead في P0): `git worktree add`، ينسخ `.env.example` إلى `.env` مع `COMPOSE_PROJECT_NAME=<repo>-<NAME>` و `EDGE_PORT` فريد (8081..8084)، ويضبط مؤلف الـ commits للعضو المسؤول:
-  `git -C <wt> config extensions.worktreeConfig true && git -C <wt> config --worktree user.name "<Member>" && … user.email`
-- الـ Lead يعطي كل وكيل **المسار المطلق** لـ worktree في رسالة الإطلاق، والوكيل يبدأ كل أمر Bash بـ `cd <path> &&`.
-- التكامل الكامل (`make up`، E2E، demo) يُشغَّل من النسخة الرئيسية على `main` بعد الدمج.
-- بعد دمج أي PR: كل وكيل نشط ينفذ `git fetch && git rebase origin/main` في worktree الخاص به.
+## 4. مجلد عمل واحد (ADR-0012 — يستبدل الـ worktrees)
+- كل الوكلاء يعملون في `C:\dev\ecommerce-platform` مباشرة، على **فرع الدفعة** الذي يحدده الـ Lead (مثل `chore/p0-platform`، `feat/r1-auth-jwt`).
+- الملكية بالمجلد (§2) تمنع التعارض: لا يكتب وكيلان نفس الملف.
+- **commit لكل مهمة**، والوكيل يضيف ملفات نطاقه فقط: `git add backend/api` — ممنوع `git add -A` / `git add .` / `git commit -a`.
+- فشل commit بسبب `index.lock` ⇒ انتظر وأعد المحاولة (وكيل آخر يعمل commit الآن)؛ لا تحذف القفل.
+- التكامل (`make up`، E2E، demo) يعمل مباشرة على المجلد نفسه.
+- `make wt` يبقى متاحاً لتجربة معزولة استثنائية فقط.
 
 ## 5. الفروع والـ Commits
 - `main` محمي. فروع: `feat/r{1|2}-<scope>`, `fix/…`, `test/…`, `chore/…`, `docs/…`.

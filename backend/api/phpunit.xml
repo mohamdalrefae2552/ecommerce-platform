@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         cacheDirectory="/tmp/phpunit-cache"
+         colors="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         failOnDeprecation="true"
+         failOnPhpunitDeprecation="true"
+         displayDetailsOnTestsThatTriggerWarnings="true"
+         displayDetailsOnTestsThatTriggerDeprecations="true">
+    <testsuites>
+        <testsuite name="Arch">
+            <directory>tests/Arch</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <extensions>
+        <!-- Loads the OpenAPI contract for assertMatchesContract() (settings in gesso.php). -->
+        <bootstrap class="Studio\Gesso\PHPUnit\OpenApiCoverageExtension"/>
+    </extensions>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!-- DB_* come from the api-test service: a real PostgreSQL (db-app-test), never SQLite. -->
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_DEBUG" value="false" force="true"/>
+        <server name="ARGON_MEMORY" value="1024" force="true"/>
+        <server name="ARGON_TIME" value="1" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <!-- Exceptions are reported to the log; keep test output readable. -->
+        <server name="LOG_CHANNEL" value="null" force="true"/>
+    </php>
+</phpunit>

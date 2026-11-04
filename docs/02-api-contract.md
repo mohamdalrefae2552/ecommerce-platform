@@ -7,7 +7,7 @@
 - **الإصدار في المسار:** كل المسارات تحت `/api/v1`. إصدار جديد = مسار جديد، لا كسر لـ v1.
 - **JSON فقط:** الطلبات `application/json` (عدا رفع الصورة `multipart/form-data`). أي `Accept` آخر لا يغيّر الصيغة. Middleware `ForceJson`.
 - **أسماء الحقول:** `snake_case`. التواريخ ISO-8601 UTC (`2026-11-01T17:41:00Z`). المعرّفات ULID نصية.
-- **المال:** `{ "amount_minor": 125000, "currency": "USD" }` — لا أعداد عشرية للمال أبداً.
+- **المال:** `{ "amount_minor": 450000000, "currency": "SYP" }` — عدد صحيح بالوحدة الصغرى (1 ل.س = 100 قرش، ISO 4217) — لا أعداد عشرية للمال أبداً. العملة الوحيدة: **الليرة السورية `SYP`** (قرار الإنسان في P0).
 - **الترقيم (R1-A6):** `?page=1&per_page=20` (`per_page` من 1 إلى 100، الافتراضي 20). القيم خارج النطاق ⇒ 422 (لا قصّ صامت).
 - **غلاف القوائم:**
   ```json
@@ -52,11 +52,11 @@
 | 403 | `FORBIDDEN` | الدور لا يسمح بالعملية (مثال: زبون يغيّر حالة طلب) |
 | 404 | `NOT_FOUND` | مورد غير موجود **أو** ليس للمستخدم حق رؤيته (D-02) |
 | 405 | `METHOD_NOT_ALLOWED` | |
-| 409 | `INSUFFICIENT_STOCK` | المستودع رفض الحجز (R2-E3) + `shortages` |
+| 409 | `INSUFFICIENT_STOCK` | المستودع رفض الحجز (R2-E3)، أو خصم مخزون أكبر من المتاح في `PUT /products/{id}/stock` + `shortages` |
 | 409 | `ORDER_INVALID_TRANSITION` | انتقال حالة غير مسموح (مثال: delivered → pending) |
-| 413 | `PAYLOAD_TOO_LARGE` | صورة > 2MB أو جسم > 3MB |
+| 413 | `PAYLOAD_TOO_LARGE` | جسم الطلب > 3MB (يرد به `edge`) |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | |
-| 422 | `VALIDATION_FAILED` | + `errors` |
+| 422 | `VALIDATION_FAILED` | + `errors` (يشمل: صورة > 2MB ⇒ خطأ على `image`، حقل غير معروف في الجسم، ترقيم خارج النطاق) |
 | 422 | `IDEMPOTENCY_KEY_REUSED` | |
 | 429 | `RATE_LIMITED` | + `Retry-After` + `retry_after` |
 | 500 | `INTERNAL_ERROR` | |
@@ -90,16 +90,16 @@
 | POST | `/auth/logout` | — | 204 + حذف الكوكي + إلغاء عائلة التوكن |
 | GET | `/auth/me` | — | 200 `{data: user}` |
 
-قواعد التحقق: `email` RFC + lowercase + فريد؛ `password` ≥ 12 حرفاً + `Password::defaults()->uncompromised()` (اختياري إن لم يتوفر إنترنت في الحاوية — يُقرَّر في P1)؛ `name` 2..100.
+قواعد التحقق: `email` RFC + lowercase + فريد (≤ 254)؛ `password` 12..128 حرفاً (الحد الأعلى يمنع استنزاف argon2 — API4) + `Password::defaults()->uncompromised()` (اختياري إن لم يتوفر إنترنت في الحاوية — يُقرَّر في P1)؛ `name` 2..100.
 
 ### Products
 | Method | Path | ملاحظات | Success |
 |---|---|---|---|
 | GET | `/categories` | قائمة ثابتة مزروعة (seed) | 200 |
-| GET | `/products?category={slug}&page&per_page&q` | `q` بحث بالاسم (اختياري) | 200 قائمة؛ كل عنصر فيه `stock` (انظر أدناه) |
+| GET | `/products?category={slug}&page&per_page&q` | `q` بحث بالاسم (اختياري، 1..100 حرف)؛ `page` 1..100000 | 200 قائمة؛ كل عنصر فيه `stock` (انظر أدناه) |
 | GET | `/products/{id}` | يسأل المستودع (R2-F2) | 200 |
-| POST | `/products` | multipart: `name, description, price_minor, category_id, image` (+ `initial_stock` ابتداءً من المتطلب 2) | 201 |
-| PUT | `/products/{id}/stock` | **(المتطلب 2)** `{delta, note}` + `Idempotency-Key` ⇒ `AdjustStock` | 200 `{data:{product_id, available}}` |
+| POST | `/products` | multipart: `name` (2..120)، `description` (اختياري ≤ 2000)، `price_minor` (1..100,000,000,000)، `category_id`، `image` (+ `initial_stock` ابتداءً من المتطلب 2) | 201 |
+| PUT | `/products/{id}/stock` | **(المتطلب 2)** `{delta, note?}` (`delta` ≠ 0، \|delta\| ≤ 1,000,000، `note` ≤ 200) + `Idempotency-Key` **إلزامي** ⇒ `AdjustStock`. خصم أكبر من المتاح ⇒ 409 `INSUFFICIENT_STOCK` (+ `shortages`)؛ المستودع متوقف ⇒ 503 | 200 `{data:{product_id, available}}` |
 
 **تمثيل المخزون في المنتج (graceful degradation — PROOF-R2-2):**
 ```json
@@ -112,10 +112,10 @@
 ### Orders
 | Method | Path | Body | Success |
 |---|---|---|---|
-| POST | `/orders` | `{items:[{product_id, quantity}]}` (1..20 بنداً، quantity 1..10، بلا تكرار) + `Idempotency-Key` | 201 |
-| GET | `/orders?status&page&per_page` | | 200 |
-| GET | `/orders/{id}` | | 200 مع `items`, `total`, `status`, `status_history` |
-| PATCH | `/orders/{id}/status` | `{status, note?}` | 200 |
+| POST | `/orders` | `{items:[{product_id, quantity}]}` (1..20 بنداً، quantity 1..100، بلا تكرار) + `Idempotency-Key` | 201 |
+| GET | `/orders?status&page&per_page` | | 200 — ملخص لكل طلب (`id, user_id, status, total, item_count, created_at, updated_at`) بلا بنود ولا سجل |
+| GET | `/orders/{id}` | | 200 مع `items`, `total`, `status`, `status_history` (كل عنصر: `from, to, actor_role, note, at` — معرّف المنفّذ يُخزَّن ولا يُعرض، API3) |
+| PATCH | `/orders/{id}/status` | `{status, note?}` (`note` ≤ 500) | 200 |
 
 **آلة الحالات (Orders\Domain\OrderStatus):**
 ```
@@ -133,7 +133,7 @@ pending ──► confirmed ──► shipped ──► delivered
 الإشعارات المولّدة: `order.placed` (للزبون)، `order.status_changed` (للزبون). القنوات: database + mail (Mailpit).
 
 ### Health
-`GET /api/v1/health` ⇒ 200 `{status:"ok", checks:{db:"ok", inventory:"ok|degraded"}}` — بلا معلومات حساسة.
+`GET /api/v1/health` ⇒ 200 `{status:"ok", checks:{db:"ok", inventory:"ok|degraded"}}` — بلا معلومات حساسة. إن لم تُجب قاعدة البيانات ⇒ 500 problem+json.
 
 ## 5. التوثيق القابل للتجربة (R1-A4)
 - `swagger` على `http://localhost:8080/docs` يقرأ `openapi.yaml` مع **Try it out** يعمل (نفس الأصل ⇒ لا CORS).

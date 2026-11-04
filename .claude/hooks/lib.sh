@@ -40,9 +40,9 @@ components_changed() {
     } | sort -u
   )"
   local found=()
-  grep -qE '^apps/api/'            <<<"$files" && found+=(api)
-  grep -qE '^services/inventory/'  <<<"$files" && found+=(inventory)
-  grep -qE '^apps/web/'            <<<"$files" && found+=(web)
+  grep -qE '^backend/api/'            <<<"$files" && found+=(api)
+  grep -qE '^backend/inventory/'  <<<"$files" && found+=(inventory)
+  grep -qE '^frontend/'            <<<"$files" && found+=(web)
   grep -qE '^tests/(e2e|load|security)/' <<<"$files" && found+=(e2e)
   grep -qE '^contracts/'           <<<"$files" && found+=(contracts)
   echo "${found[*]:-}"

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "inventory",
+    "listen": "0.0.0.0:50051",
+    "upstream": "inventory:9090",
+    "enabled": true
+  }
+]

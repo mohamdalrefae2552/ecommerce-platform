@@ -6,7 +6,7 @@
 | الطرف | الآلية | المخرج |
 |---|---|---|
 | Spring (خادم) | Gradle `com.google.protobuf` plugin، `sourceSets.main.proto.srcDir("../../contracts/proto")` — Spring Boot 4.1 يضبط `protoc` وإصداره تلقائياً | `build/generated/…` (غير مُلتزَم) |
-| Laravel (عميل) | `make gen` ← حاوية `protoc` (`protoc` + `grpc_php_plugin`) | `apps/api/generated/grpc/` (مُلتزَم + فحص انحراف `git diff --exit-code` في CI) |
+| Laravel (عميل) | `make gen` ← `buf generate` في حاوية `buf` بإضافات BSR مثبتة (`protocolbuffers/php:v36.2` + `grpc/php:v1.85.0`) | `backend/api/generated/grpc/` (مُلتزَم + فحص انحراف `git diff --exit-code` في CI) |
 autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/"` و `GPBMetadata` بالمثل.
 
 ## 2. المهل (Deadlines) — R2-E2
@@ -20,13 +20,15 @@ autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/
 - Spring: الخادم يتحقق من `Context.current().getDeadline()` قبل بدء الـ transaction ويرفض بـ `DEADLINE_EXCEEDED` إن انتهى؛ و `statement_timeout`/`lock_timeout` في Postgres أقل من أطول مهلة (مثال: `lock_timeout=1500ms`).
 
 ## 3. خريطة الأخطاء
-### في الخادم (Spring — `@GrpcAdvice`)
+### في الخادم (Spring — bean من نوع `GrpcExceptionHandler`؛ لا يوجد `@GrpcAdvice` في Boot 4.1)
 | الحالة | gRPC status |
 |---|---|
-| مدخل غير صالح (ULID خاطئ، كمية خارج 1..1000، بنود مكررة، قائمة فارغة/أكثر من 100، reservation_id ليس UUID) | `INVALID_ARGUMENT` + رسالة تصف الحقل |
+| مدخل غير صالح (ULID خاطئ، كمية خارج 1..1000، بنود مكررة، قائمة فارغة/أكثر من 100، reservation_id/adjustment_id ليس UUID، `reason = RELEASE_REASON_UNSPECIFIED`، `delta = 0` أو \|delta\| > 1,000,000، `note` > 200 حرف) | `INVALID_ARGUMENT` + رسالة تصف الحقل |
 | AdjustStock يجعل الكمية سالبة | `FAILED_PRECONDITION` |
 | انتهاء المهلة/إلغاء العميل | `DEADLINE_EXCEEDED` / `CANCELLED` |
-| `lock_timeout` في DB | `ABORTED` (العميل يعامله كـ UNAVAILABLE) |
+| `lock_timeout` في DB، deadlock، فشل serialization | `ABORTED` (العميل يعامله كـ UNAVAILABLE) |
+| `statement_timeout` في DB | `DEADLINE_EXCEEDED` إن انتهت مهلة العميل، وإلا `ABORTED` |
+| لا اتصال بقاعدة المخزون (pool ممتلئ أو DB متوقفة) | `UNAVAILABLE` |
 | أي استثناء آخر | `INTERNAL` (بلا تفاصيل داخلية في الرسالة، التفاصيل في الـ log مع request-id) |
 | نقص الكمية | **ليس خطأ**: `OK` + `RESERVE_OUTCOME_INSUFFICIENT_STOCK` |
 
@@ -38,6 +40,7 @@ autoload: `"Ecommerce\\Inventory\\V1\\": "generated/grpc/Ecommerce/Inventory/V1/
 | OK + RESERVATION_ALREADY_RELEASED | `ReservationAborted` | 503 `INVENTORY_TIMEOUT` (لا يحدث إلا بعد مهلة سابقة) |
 | `DEADLINE_EXCEEDED` | `InventoryTimeout` | 503 `INVENTORY_TIMEOUT` + `Retry-After: 5` |
 | `UNAVAILABLE`, `ABORTED`, `RESOURCE_EXHAUSTED` | `InventoryUnavailable` | 503 `INVENTORY_UNAVAILABLE` + `Retry-After: 5` |
+| `FAILED_PRECONDITION` (AdjustStock فقط) | `StockWouldBeNegative(available)` | 409 `INSUFFICIENT_STOCK` + `shortages` (`requested` = الكمية المطلوب خصمها) |
 | `INVALID_ARGUMENT`, `INTERNAL`, غيرها | `InventoryContractViolation` (يُسجَّل error) | 500 `INTERNAL_ERROR` |
 **قاعدة:** أي نتيجة غير مؤكدة لـ ReserveStock (Timeout/Unavailable/Aborted) ⇒ تعويض فوري `ReleaseStock(RESERVE_OUTCOME_UNKNOWN)`.
 

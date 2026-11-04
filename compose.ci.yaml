@@ -1,0 +1,40 @@
+# CI-only overlay (loaded by the Makefile when COMPOSE_CI=1):
+#   - BuildKit layer cache stored in GitHub Actions (needs buildx and
+#     crazy-max/ghaction-github-runtime in the job),
+#   - dependency caches bind-mounted under .cache/ so actions/cache can
+#     save and restore them between runs.
+x-gha-cache: &gha-cache
+  cache_from:
+    - type=gha
+  cache_to:
+    - type=gha,mode=max
+
+services:
+  edge:
+    build: *gha-cache
+  api:
+    build: *gha-cache
+  scheduler:
+    build: *gha-cache
+  inventory:
+    build: *gha-cache
+  api-test:
+    build: *gha-cache
+  web-test:
+    build: *gha-cache
+  toolbox:
+    build: *gha-cache
+
+volumes:
+  gradle-cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.cache/gradle
+  pnpm-store:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.cache/pnpm

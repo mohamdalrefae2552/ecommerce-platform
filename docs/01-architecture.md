@@ -23,18 +23,18 @@ flowchart LR
 ## 2. خدمات Compose
 | الخدمة | الصورة/البناء | ملاحظات |
 |---|---|---|
-| `edge` | `nginx:1.29-alpine` + `infra/nginx/` | `server_tokens off`، `client_max_body_size 3m`، ترويسات أمان للـ SPA |
-| `api` | `apps/api/Dockerfile` (php:8.4-fpm + `ext-grpc` + `ext-pdo_pgsql` + `ext-sodium` + opcache) | `expose_php=Off`؛ healthcheck عبر `php-fpm-healthcheck` أو `/api/v1/health` |
+| `edge` | `nginx:1.30.6-alpine` (stable؛ فرع 1.29 انتهى — ADR-0010) + `infra/nginx/` | `server_tokens off`، `client_max_body_size 3m`، ترويسات أمان للـ SPA |
+| `api` | `backend/api/Dockerfile` (php:8.4-fpm + `ext-grpc` + `ext-pdo_pgsql` + `ext-sodium` + opcache) | `expose_php=Off`؛ healthcheck عبر `php-fpm-healthcheck` أو `/api/v1/health` |
 | `scheduler` | نفس صورة `api` | `php artisan schedule:work` (المصالحة كل دقيقة) |
 | `db-app` | `postgres:18-alpine` | volume مستقل |
-| `inventory` | `services/inventory/Dockerfile` (multi-stage، JRE 25، مستخدم غير root) | gRPC health + reflection؛ actuator على منفذ داخلي |
+| `inventory` | `backend/inventory/Dockerfile` (multi-stage، JRE 25، مستخدم غير root) | gRPC health + reflection؛ actuator على منفذ داخلي |
 | `db-inventory` | `postgres:18-alpine` | volume مستقل، **لا يصل إليها `api` شبكياً** (شبكة `inventory-net` منفصلة) |
 | `toxiproxy` | `ghcr.io/shopify/toxiproxy` | proxy `inventory` : `0.0.0.0:50051 → inventory:9090` |
 | `swagger` | `swaggerapi/swagger-ui` | يقرأ `contracts/openapi/openapi.yaml` |
 | `mailpit` | `axllent/mailpit` | بريد الإشعارات في التطوير |
 | `web-dev` (profile `dev`) | Vite dev server | proxy `/api` → `edge` |
 | `k6` (profile `tools`) | `grafana/k6` | `tests/load/` |
-| `protoc` (profile `tools`) | `infra/protoc/Dockerfile` | توليد PHP stubs (`protoc` + `grpc_php_plugin`) |
+| `buf` (profile `tools`) | `bufbuild/buf:1.75.0` | lint/breaking/format + توليد PHP stubs بإضافات BSR مثبتة الإصدار (`buf.gen.yaml`) |
 | `toolbox` (profile `tools`) | `infra/toolbox/Dockerfile` | `grpcurl` + `psql` + `jq` + `curl` للعرض والتشخيص؛ متصل بالشبكتين (أداة تشخيص فقط، ليست جزءاً من التطبيق) |
 
 **عزل الشبكات (يثبت R2-S2 مادياً):**
@@ -44,7 +44,7 @@ flowchart LR
 
 ## 3. التطبيق الأساسي — Modular Monolith (Laravel)
 ```
-apps/api/
+backend/api/
 ├── app/
 │   ├── Modules/
 │   │   ├── Users/          Http/{Controllers,Requests,Resources} · Models · Actions · Policies · Contracts · Database/{Migrations,Factories,Seeders} · Providers/UsersServiceProvider.php · routes.php
@@ -68,15 +68,15 @@ apps/api/
 ### نمط الكود داخل الوحدة
 - Controller رفيع: يتحقق (FormRequest) ← يفوّض (Policy) ← ينفّذ Action ← يعيد Resource.
 - Action = حالة استخدام واحدة، قابلة للاختبار دون HTTP (`CreateOrder`, `ChangeOrderStatus`, `RegisterUser`…).
-- المعرّفات ULID (`HasUlids`). المال: عدد صحيح بالوحدة الصغرى (`price_minor`) + `currency` ثابتة `SYP`/`USD` (قرار في P0).
+- المعرّفات ULID (`HasUlids`). المال: عدد صحيح بالوحدة الصغرى (`price_minor`) + `currency` ثابتة `SYP` (قرار الإنسان في P0).
 - لا Eloquent خارج وحدته. لا `Model::unguard()`. `$fillable` صريح.
 
 ## 4. خدمة المخزون — Hexagonal (Spring Boot)
 ```
-services/inventory/
+backend/inventory/
 ├── build.gradle.kts            protobuf plugin يقرأ ../../contracts/proto
 ├── src/main/java/com/ecommerce/inventory/
-│   ├── grpc/                   InventoryGrpcService (adapter) · GrpcExceptionAdvice (@GrpcAdvice) · RequestValidator · RequestIdServerInterceptor
+│   ├── grpc/                   InventoryGrpcService (adapter) · InventoryExceptionHandler (`GrpcExceptionHandler` bean) · RequestValidator · RequestIdServerInterceptor
 │   ├── application/            ReservationService · StockQueryService · StockAdjustmentService  (@Transactional هنا فقط)
 │   ├── domain/                 Reservation, ReservationStatus, StockLevel, Shortage, exceptions  (Java records/sealed, بلا Spring)
 │   └── persistence/            StockRepository · ReservationRepository  (JdbcClient + SQL صريح)
@@ -89,7 +89,7 @@ services/inventory/
 
 ## 5. الواجهة (React)
 ```
-apps/web/src/
+frontend/src/
 ├── api/        schema.d.ts (مولَّد) · client.ts (openapi-fetch + auth middleware + single-flight refresh) · problem.ts
 ├── auth/       AuthProvider (access token في الذاكرة فقط) · guards
 ├── features/   products/ · cart/ · orders/ · admin/ · notifications/

@@ -1,0 +1,100 @@
+package com.ecommerce.inventory.application;
+
+import com.ecommerce.inventory.domain.ReleaseReason;
+import com.ecommerce.inventory.domain.ReleaseResult;
+import com.ecommerce.inventory.domain.ReservationLine;
+import com.ecommerce.inventory.domain.ReservationStatus;
+import com.ecommerce.inventory.domain.ReserveResult;
+import com.ecommerce.inventory.domain.Shortage;
+import com.ecommerce.inventory.domain.Shortages;
+import com.ecommerce.inventory.persistence.ReservationRepository;
+import com.ecommerce.inventory.persistence.StockRepository;
+import com.ecommerce.inventory.persistence.TransactionTimeouts;
+import java.time.Duration;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+
+/**
+ * ReserveStock (R2-C2) and ReleaseStock (R2-C3): the algorithms of docs/05 section 2, each in one
+ * READ COMMITTED transaction. Stock rows are always locked in product_id order.
+ */
+@Service
+public class ReservationService {
+
+  private final ReservationRepository reservations;
+  private final StockRepository stock;
+  private final TransactionTimeouts timeouts;
+
+  public ReservationService(
+      ReservationRepository reservations, StockRepository stock, TransactionTimeouts timeouts) {
+    this.reservations = reservations;
+    this.stock = stock;
+    this.timeouts = timeouts;
+  }
+
+  /**
+   * Reserves every line or nothing. Idempotent by reservation id: a repeat is answered from the
+   * stored reservation, and an id released earlier (tombstone) reserves nothing.
+   *
+   * @param lines distinct products, already validated
+   * @param budget time the caller still allows; bounds every lock wait and statement
+   */
+  @Transactional
+  public ReserveResult reserve(UUID reservationId, List<ReservationLine> lines, Duration budget) {
+    timeouts.limitTo(budget);
+    if (!reservations.insertReserved(reservationId)) {
+      return switch (reservations.findStatus(reservationId).orElseThrow()) {
+        case RESERVED -> new ReserveResult.Reserved();
+        case RELEASED -> new ReserveResult.AlreadyReleased();
+      };
+    }
+
+    List<ReservationLine> ordered =
+        lines.stream().sorted(Comparator.comparing(ReservationLine::productId)).toList();
+    Map<String, Long> available =
+        stock.lockAvailable(ordered.stream().map(ReservationLine::productId).toList());
+
+    List<Shortage> shortages = Shortages.of(ordered, available);
+    if (!shortages.isEmpty()) {
+      // Full rollback: the reservations row claimed above disappears too.
+      TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+      return new ReserveResult.InsufficientStock(shortages);
+    }
+
+    for (ReservationLine line : ordered) {
+      stock.decrement(line.productId(), line.quantity());
+      reservations.insertLine(reservationId, line.productId(), line.quantity());
+    }
+    return new ReserveResult.Reserved();
+  }
+
+  /**
+   * ReleaseStock (R2-C3): returns the quantities of an active reservation exactly once. An unknown
+   * id gets a tombstone so that a late ReserveStock with it reserves nothing.
+   *
+   * @param budget time the caller still allows; bounds every lock wait and statement
+   */
+  @Transactional
+  public ReleaseResult release(UUID reservationId, ReleaseReason reason, Duration budget) {
+    timeouts.limitTo(budget);
+    if (reservations.insertTombstone(reservationId, reason)) {
+      return ReleaseResult.NOT_FOUND_TOMBSTONED;
+    }
+    if (reservations.lockStatus(reservationId).orElseThrow() == ReservationStatus.RELEASED) {
+      return ReleaseResult.ALREADY_RELEASED;
+    }
+
+    List<ReservationLine> lines = reservations.findLines(reservationId);
+    stock.lockAvailable(lines.stream().map(ReservationLine::productId).toList());
+    for (ReservationLine line : lines) {
+      stock.increment(line.productId(), line.quantity());
+    }
+    reservations.markReleased(reservationId, reason);
+    return ReleaseResult.RELEASED;
+  }
+}

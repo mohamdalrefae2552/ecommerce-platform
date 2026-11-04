@@ -56,7 +56,10 @@ CREATE TABLE stock_adjustments (
    - `RESERVED` ⇒ أقفل صفوف `stock_items` للبنود **بترتيب product_id**، أعد الكميات، `status='RELEASED'` ⇒ `RELEASED`.
 
 ### `AdjustStock`
-`INSERT stock_adjustments … ON CONFLICT (id) DO NOTHING` (idempotency) ⇒ upsert في `stock_items` (`INSERT … ON CONFLICT (product_id) DO UPDATE SET available = stock_items.available + :delta`) — النتيجة السالبة تكسر CHECK ⇒ `FAILED_PRECONDITION`.
+معاملة واحدة بالترتيب:
+1. `INSERT INTO stock_items(product_id, available) VALUES (:pid, 0) ON CONFLICT (product_id) DO NOTHING` — منتج يُرى لأول مرة يحصل على صف (وإلا يفشل FK في الخطوة 2).
+2. `INSERT INTO stock_adjustments … ON CONFLICT (id) DO NOTHING` (idempotency). لم يُدرج ⇒ تعديل مكرر ⇒ أعد الكمية الحالية **دون** تطبيق delta (والطلب المكرر بحمولة مختلفة يُتجاهل — من يضمن تطابق الحمولة هو Laravel عبر `Idempotency-Key`).
+3. `UPDATE stock_items SET available = available + :delta … WHERE product_id = :pid RETURNING available` — النتيجة السالبة تكسر CHECK ⇒ `ROLLBACK` كامل (يمحو الصف الجديد والتعديل) ⇒ `FAILED_PRECONDITION`. يشمل ذلك delta سالباً لمنتج جديد.
 
 ### البدائل التي رُفضت (اذكرها في المقابلة)
 | البديل | لماذا لا |

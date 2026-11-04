@@ -1,0 +1,23 @@
+# PHP client stubs for backend/api (Laravel). Run from contracts/proto by
+# `make gen` inside the `buf` tools container.
+#
+# Remote plugins from the Buf Schema Registry, pinned to exact versions, so no
+# protoc / grpc_php_plugin has to be compiled locally:
+#   - protocolbuffers/php v36.2 matches the google/protobuf PHP runtime 5.36.2
+#     (and protobuf-java 4.36.2 on the Spring side) — ADR-0010.
+#   - grpc/php v1.85.0 matches the grpc/grpc PHP library 1.85.0.
+#
+# The Spring Boot server does NOT use this file: its Gradle protobuf plugin reads
+# contracts/proto directly and generates into build/ (not committed).
+#
+# Output is committed under backend/api/generated/grpc and CI fails on drift
+# (`make gen && git diff --exit-code`). Never edit the generated files by hand.
+version: v2
+clean: true
+plugins:
+  # Message classes.
+  - remote: buf.build/protocolbuffers/php:v36.2
+    out: ../../backend/api/generated/grpc
+  # Client stubs (InventoryServiceClient).
+  - remote: buf.build/grpc/php:v1.85.0
+    out: ../../backend/api/generated/grpc

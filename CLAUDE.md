@@ -18,9 +18,9 @@
 ## 2. التقنيات (مثبّتة الإصدارات — لا تغيّرها دون ADR)
 | المكوّن | التقنية |
 |---|---|
-| التطبيق الأساسي `apps/api` | PHP 8.4 · Laravel 13 · Pest 4 · Larastan · Pint · PostgreSQL 18 |
-| خدمة المخزون `services/inventory` | Java 25 · Spring Boot 4.1 (`spring-boot-starter-grpc-server`) · Gradle (Kotlin DSL) · JdbcClient · Flyway · Testcontainers · PostgreSQL 18 |
-| الواجهة `apps/web` | React 19 · TypeScript (strict) · Vite 8 · TanStack Router + Query · openapi-typescript/openapi-fetch · Zod · Vitest · MSW · Playwright |
+| التطبيق الأساسي `backend/api` | PHP 8.4 · Laravel 13 · Pest 4 · Larastan · Pint · PostgreSQL 18 |
+| خدمة المخزون `backend/inventory` | Java 25 · Spring Boot 4.1 (`spring-boot-starter-grpc-server`) · Gradle (Kotlin DSL) · JdbcClient · Flyway · Testcontainers · PostgreSQL 18 |
+| الواجهة `frontend` | React 19 · TypeScript (strict) · Vite 8 · TanStack Router + Query · openapi-typescript/openapi-fetch · Zod · Vitest · MSW · Playwright |
 | العقود `contracts/` | OpenAPI 3.1 (REST) · Protobuf + buf (gRPC) |
 | التشغيل | Docker Compose · nginx (edge) · Toxiproxy (حقن الأعطال) · Mailpit · k6 |
 
@@ -30,14 +30,14 @@
 ```
 contracts/            ← Lead فقط  (openapi/openapi.yaml, proto/, errors.md)
 docs/  tasks/  CLAUDE.md  compose*.yaml  Makefile  .github/  infra/   ← Lead فقط
-apps/api/             ← laravel-engineer
-services/inventory/   ← spring-engineer
-apps/web/             ← react-engineer
+backend/api/          ← laravel-engineer
+backend/inventory/    ← spring-engineer
+frontend/             ← react-engineer
 tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 ```
 - **لا يعدّل أي وكيل ملفاً خارج نطاقه.** إن احتجت تغييراً خارجه: أرسل رسالة (SendMessage) للمالك أو للـ Lead مع السبب والتعديل المقترح بالضبط.
 - **العقد أولاً:** لا يُكتب endpoint أو RPC غير موجود في العقد. تغيير العقد = طلب للـ Lead ← يطبّق skill `contract-first` ← يُعلم الجميع.
-- الكود المولَّد (`apps/api/generated/`, `apps/web/src/api/schema.d.ts`) لا يُعدّل يدوياً أبداً؛ يُولَّد بـ `make gen`.
+- الكود المولَّد (`backend/api/generated/`, `frontend/src/api/schema.d.ts`) لا يُعدّل يدوياً أبداً؛ يُولَّد بـ `make gen`.
 
 ## 4. القواعد الذهبية (غير قابلة للتفاوض)
 1. **لا تخمين.** أي غموض في المتطلب أو العقد → توقّف واسأل الـ Lead (والـ Lead يسأل الإنسان). لا "حلول مؤقتة" ولا TODO صامت ولا كود demo.
@@ -62,7 +62,7 @@ tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 | `make race-test` | إثبات الـ Race Condition (k6: طلبات متزامنة على آخر قطعة) |
 | `make chaos-latency MS=3000` / `make chaos-down` / `make chaos-reset` | حقن بطء/توقف بين التطبيق والمستودع |
 | `make demo-r1` / `make demo-r2` | سيناريوهات المقابلة |
-| `make wt NAME=api BRANCH=feat/r1-auth-jwt` / `make wt-rm NAME=api` | إنشاء/حذف git worktree لوكيل |
+| `make wt NAME=x BRANCH=…` / `make wt-rm NAME=x` | worktree منفصل لتجربة معزولة فقط (ليس سير العمل الافتراضي — ADR-0012) |
 | `make fmt-file FILE=<abs path>` | تنسيق ملف واحد (يستدعيه hook تلقائياً بعد كل تعديل؛ يطبع `FMT_INVALID:` إن كان الملف غير صالح) |
 
 الأوامر تعمل داخل الحاويات؛ لا يلزم PHP/Java/Node على الجهاز (Node مطلوب فقط لـ Claude Code نفسه).
@@ -80,8 +80,8 @@ tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 - **فريق Backend:** `laravel-engineer` + `spring-engineer`.
 - **فريق Frontend & Quality:** `react-engineer` + `qa-security-engineer`.
 - مراجع مستقل: subagent `code-reviewer` (قراءة فقط) يُستدعى قبل كل PR.
-- كل عضو يعمل في **worktree خاص به** (مسار مطلق يعطيه الـ Lead في رسالة الإطلاق) وعلى فرع المهمة. لا يعمل أي وكيل في مجلد غيره.
-- بروتوكول التواصل وتفاصيل الـ worktrees: `docs/07-team-and-git-workflow.md`.
+- **كل الوكلاء يعملون في مجلد المشروع نفسه** (`C:\dev\ecommerce-platform`) وعلى فرع الدفعة الحالي (ADR-0012). كل وكيل يعدّل مجلد نطاقه فقط، ويُضيف للـ commit ملفات نطاقه فقط (`git add <مجلدك>` — ممنوع `git add -A` / `git add .` / `commit -a`).
+- بروتوكول التواصل والفروع: `docs/07-team-and-git-workflow.md`.
 
 ## 8. قرارات مفتوحة تحتاج تأكيد الإنسان (لا تتجاوزها)
 | # | القرار | الافتراض الحالي |
@@ -89,6 +89,8 @@ tests/e2e/ tests/load/ tests/security/   ← qa-security-engineer
 | D-01 | إضافة RPC رابع `AdjustStock` لإدارة المخزون | **محسوم ✅ (تأكيد الإنسان):** كل إدارة المخزون في Spring Boot؛ Laravel يمرّرها عبر gRPC فقط |
 | D-02 | رد قراءة طلب زبون آخر: 404 أم 403 | 404 (لا نكشف وجود المورد — OWASP)؛ وتغيير الحالة من زبون = 403 |
 | D-03 | التوثيق: OpenAPI مكتوب يدوياً (Contract-first) | نعم، مع اختبار مطابقة تلقائي |
+| D-04 | مستخدمو الاختبار (حد التسجيل 5/ساعة/IP يمنع إنشاءهم عبر API) | **محسوم ✅:** seeder لزبائن اختبار في غير الإنتاج فقط؛ حد التسجيل لا يُرفع في أي بيئة |
+| D-05 | حساب المسؤول للاختبارات وE2E و k6 | **محسوم ✅:** `make bootstrap` يُنشئ مسؤول تطوير ببيانات مولّدة عشوائياً في `.env` (غير الإنتاج فقط) وتُمرَّر لخدمتي `e2e` و `k6` |
 
 ## 9. مراجع (اقرأ عند الحاجة)
 - المعمارية والتدفقات: `docs/01-architecture.md`

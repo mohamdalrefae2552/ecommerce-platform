@@ -1,0 +1,29 @@
+# Normalise every text file to LF in the repository and in working trees,
+# so shell scripts and config files work inside Linux containers even when
+# the repository is checked out on Windows.
+* text=auto eol=lf
+
+# Scripts must be LF or bash fails with "\r: command not found".
+*.sh   text eol=lf
+Makefile text eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# Binary assets.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.jar  binary
+*.pdf  binary
+
+# Generated code: collapsed in diffs and excluded from language stats.
+backend/api/generated/** linguist-generated=true -diff
+frontend/src/api/schema.d.ts linguist-generated=true
+**/pnpm-lock.yaml linguist-generated=true -diff
+**/composer.lock linguist-generated=true -diff
