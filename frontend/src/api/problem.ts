@@ -12,9 +12,9 @@ export type ProblemCode = components['schemas']['ProblemCode'];
 export const problemMessages = {
   MALFORMED_REQUEST: 'تعذّر قراءة الطلب. حدّث الصفحة وحاول مجدداً.',
   UNAUTHENTICATED: 'يجب تسجيل الدخول للمتابعة.',
-  TOKEN_EXPIRED: 'انتهت صلاحية الجلسة. يجري تجديدها، حاول مجدداً.',
+  TOKEN_EXPIRED: 'انتهت الجلسة، يرجى تسجيل الدخول من جديد.',
   INVALID_CREDENTIALS: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
-  REFRESH_TOKEN_INVALID: 'انتهت الجلسة، يرجى تسجيل الدخول من جديد.',
+  REFRESH_TOKEN_INVALID: 'انتهت الجلسة ولم يمكن تجديدها، يرجى تسجيل الدخول من جديد.',
   FORBIDDEN: 'ليست لديك صلاحية لتنفيذ هذه العملية.',
   NOT_FOUND: 'المورد المطلوب غير موجود.',
   METHOD_NOT_ALLOWED: 'هذه العملية غير مدعومة.',
@@ -24,14 +24,18 @@ export const problemMessages = {
   UNSUPPORTED_MEDIA_TYPE: 'نوع الملف أو البيانات المرسلة غير مقبول.',
   VALIDATION_FAILED: 'بعض الحقول غير صحيحة. راجعها وحاول مجدداً.',
   IDEMPOTENCY_KEY_REUSED: 'تغيّر محتوى الطلب أثناء إعادة الإرسال. حدّث السلة وحاول مجدداً.',
-  RATE_LIMITED: 'محاولات كثيرة. انتظر قليلاً ثم حاول مجدداً.',
+  RATE_LIMITED: 'محاولات كثيرة.',
   INTERNAL_ERROR: 'حدث خطأ غير متوقع في الخادم. حاول لاحقاً.',
-  INVENTORY_UNAVAILABLE: 'خدمة المخزون متوقفة حالياً. حاول بعد قليل.',
-  INVENTORY_TIMEOUT: 'خدمة المخزون لم تستجب في الوقت المحدد. حاول بعد قليل.',
+  INVENTORY_UNAVAILABLE: 'خدمة المخزون غير متاحة حالياً.',
+  INVENTORY_TIMEOUT: 'خدمة المخزون لم تستجب في الوقت المحدد.',
 } as const satisfies Record<ProblemCode, string>;
 
 /** Shown when a response is not a valid problem (HTML from a proxy, broken JSON, unknown code). */
 export const unexpectedResponseMessage = 'وصل رد غير متوقع من الخادم. حاول لاحقاً.';
+
+/** Shown when the server did not answer before the client-side deadline. */
+export const requestTimeoutMessage =
+  'لم يصل رد الخادم في الوقت المحدد. أعد المحاولة؛ إعادة الإرسال آمنة ولن تكرر العملية.';
 
 /** Shown when the request never got an HTTP response (offline, DNS, connection reset). */
 export const networkErrorMessage = 'تعذّر الاتصال بالخادم. تحقّق من الاتصال وحاول مجدداً.';
@@ -42,8 +46,8 @@ export function isProblemCode(value: unknown): value is ProblemCode {
 
 /**
  * Runtime shape of `components.schemas.Problem` plus the documented
- * extensions (`errors` for 422, `retry_after` for 429/503). Unknown members
- * are dropped.
+ * extensions (`errors` for 422, `retry_after` for 429/503, `shortages` for
+ * 409 INSUFFICIENT_STOCK). Unknown members are dropped.
  */
 export const problemSchema = z.object({
   type: z.string(),
@@ -55,9 +59,20 @@ export const problemSchema = z.object({
   trace_id: z.string(),
   errors: z.record(z.string(), z.array(z.string()).min(1)).optional(),
   retry_after: z.number().int().min(1).optional(),
+  shortages: z
+    .array(
+      z.object({
+        product_id: z.string(),
+        requested: z.number().int().min(1),
+        available: z.number().int().min(0),
+      }),
+    )
+    .min(1)
+    .optional(),
 });
 
 export type Problem = z.infer<typeof problemSchema>;
+export type Shortage = NonNullable<Problem['shortages']>[number];
 
 export function isProblemContentType(contentType: string | null): boolean {
   if (contentType === null) return false;
@@ -94,6 +109,11 @@ export class ProblemError extends Error {
   get retryAfter(): number | null {
     return this.problem.retry_after ?? null;
   }
+
+  /** Short lines of a 409 `INSUFFICIENT_STOCK`; empty otherwise. */
+  get shortages(): readonly Shortage[] {
+    return this.problem.shortages ?? [];
+  }
 }
 
 /** A failed response that is not a valid problem+json (e.g. an HTML 502 from a proxy). */
@@ -112,6 +132,15 @@ export class UnexpectedResponseError extends Error {
   }
 }
 
+/** The client-side deadline elapsed before the server answered. */
+export class RequestTimeoutError extends Error {
+  override readonly name = 'RequestTimeoutError';
+
+  constructor(cause: unknown) {
+    super(requestTimeoutMessage, { cause });
+  }
+}
+
 /** The request did not produce an HTTP response at all. */
 export class NetworkError extends Error {
   override readonly name = 'NetworkError';
@@ -121,14 +150,43 @@ export class NetworkError extends Error {
   }
 }
 
+/** "حاول بعد 5 ثوانٍ" style suffix (Arabic plural rules for seconds). */
+export function retryAfterText(seconds: number): string {
+  if (seconds === 1) return 'حاول بعد ثانية واحدة.';
+  if (seconds === 2) return 'حاول بعد ثانيتين.';
+  if (seconds >= 3 && seconds <= 10) return `حاول بعد ${String(seconds)} ثوانٍ.`;
+  return `حاول بعد ${String(seconds)} ثانية.`;
+}
+
+const RETRYABLE_CODES: ReadonlySet<ProblemCode> = new Set([
+  'RATE_LIMITED',
+  'INVENTORY_UNAVAILABLE',
+  'INVENTORY_TIMEOUT',
+]);
+
 /** Arabic message for anything a query or mutation may throw. */
 export function userMessage(error: unknown): string {
+  if (error instanceof ProblemError) {
+    const wait = error.retryAfter;
+    if (wait !== null) return `${error.message} ${retryAfterText(wait)}`;
+    return RETRYABLE_CODES.has(error.code) ? `${error.message} حاول بعد قليل.` : error.message;
+  }
   if (
-    error instanceof ProblemError ||
     error instanceof UnexpectedResponseError ||
-    error instanceof NetworkError
+    error instanceof NetworkError ||
+    error instanceof RequestTimeoutError
   ) {
     return error.message;
   }
   return unexpectedResponseMessage;
+}
+
+/** True when the error means "you are not (or no longer) logged in". */
+export function isAuthError(error: unknown): boolean {
+  return (
+    error instanceof ProblemError &&
+    (error.code === 'UNAUTHENTICATED' ||
+      error.code === 'TOKEN_EXPIRED' ||
+      error.code === 'REFRESH_TOKEN_INVALID')
+  );
 }

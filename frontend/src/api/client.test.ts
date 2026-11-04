@@ -1,17 +1,28 @@
-import { HttpResponse, http } from 'msw';
+import { HttpResponse, delay, http } from 'msw';
 import { describe, expect, it } from 'vitest';
-import { setAccessToken } from '../auth/token';
-import { apiUrl, healthOk, mockUser, problemResponse } from '../mocks/handlers';
+import { endSession, getSession, startSession } from '../auth/session';
+import { customer as mockUser, db, issueToken, problem } from '../mocks/db';
+import { apiUrl, healthOk, problemResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
-import { API_PATH, api, createApiClient, requireData } from './client';
+import { API_PATH, api, createApiClient, requireData, restoreSession } from './client';
 import {
   NetworkError,
   ProblemError,
+  RequestTimeoutError,
   UnexpectedResponseError,
   networkErrorMessage,
   problemMessages,
+  requestTimeoutMessage,
   unexpectedResponseMessage,
 } from './problem';
+
+function setAccessToken(token: string | null): void {
+  if (token === null) {
+    endSession();
+  } else {
+    startSession({ access_token: token, token_type: 'Bearer', expires_in: 900, user: mockUser });
+  }
+}
 
 const EDGE_REQUEST_ID = /^[A-Za-z0-9._-]{1,128}$/;
 const TRACE_ID = '01JC3Z9A1B2C3D4E5F6G7H8J9K';
@@ -281,5 +292,147 @@ describe('api client — responses that break the error contract', () => {
     expect(error).toBeInstanceOf(NetworkError);
     if (!(error instanceof NetworkError)) return;
     expect(error.message).toBe(networkErrorMessage);
+  });
+});
+
+describe('api client — client-side deadline', () => {
+  it('maps an elapsed deadline to RequestTimeoutError with a clear message', async () => {
+    server.use(
+      http.get(apiUrl('/health'), async () => {
+        await delay(500);
+        return HttpResponse.json(healthOk);
+      }),
+    );
+    const client = createApiClient({
+      baseUrl: new URL(API_PATH, window.location.origin).href,
+      getAccessToken: () => null,
+      timeoutMs: 50,
+    });
+
+    const error = await rejectionOf(client.GET('/health'));
+
+    expect(error).toBeInstanceOf(RequestTimeoutError);
+    if (!(error instanceof RequestTimeoutError)) return;
+    expect(error.message).toBe(requestTimeoutMessage);
+  });
+});
+
+describe('api client — refresh on TOKEN_EXPIRED', () => {
+  function expireCurrentToken(): void {
+    const session = getSession();
+    if (session.status !== 'authenticated') throw new Error('expected a session');
+    db.expiredTokens.add(session.accessToken);
+  }
+
+  function countRefreshes(): { count: number } {
+    const counter = { count: 0 };
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/auth/refresh')) counter.count += 1;
+    });
+    return counter;
+  }
+
+  it('renews the token once for concurrent 401s and replays each request once', async () => {
+    startSession(issueToken(mockUser.id));
+    expireCurrentToken();
+    const refreshes = countRefreshes();
+
+    const results = await Promise.all([
+      api.GET('/auth/me'),
+      api.GET('/auth/me'),
+      api.GET('/auth/me'),
+    ]);
+
+    expect(refreshes.count).toBe(1);
+    expect(results.map((r) => r.data?.data.id)).toEqual([mockUser.id, mockUser.id, mockUser.id]);
+    const session = getSession();
+    expect(session.status).toBe('authenticated');
+    if (session.status === 'authenticated') {
+      expect(db.expiredTokens.has(session.accessToken)).toBe(false);
+    }
+  });
+
+  it('replays a POST with the same body and Idempotency-Key', async () => {
+    startSession(issueToken(mockUser.id));
+    expireCurrentToken();
+    const seen: { key: string | null; body: string; auth: string | null }[] = [];
+    server.use(
+      http.post(apiUrl('/orders'), async ({ request }) => {
+        const body = await request.text();
+        seen.push({
+          key: request.headers.get('Idempotency-Key'),
+          body,
+          auth: request.headers.get('Authorization'),
+        });
+        const token = request.headers.get('Authorization')?.slice('Bearer '.length) ?? '';
+        if (db.expiredTokens.has(token)) {
+          return problemResponse(problem('TOKEN_EXPIRED', 401, '/api/v1/orders'));
+        }
+        return problemResponse(problem('NOT_FOUND', 404, '/api/v1/orders'));
+      }),
+    );
+    const key = '3f1c2a9e-6b7d-4c8e-9f10-2a3b4c5d6e7f';
+
+    await rejectionOf(
+      api.POST('/orders', {
+        params: { header: { 'Idempotency-Key': key } },
+        body: { items: [{ product_id: '01JC40A1B2C3D4E5F6G7H8J9KM', quantity: 1 }] },
+      }),
+    );
+
+    expect(seen).toHaveLength(2);
+    expect(seen[0]?.key).toBe(key);
+    expect(seen[1]?.key).toBe(key);
+    expect(seen[1]?.body).toBe(seen[0]?.body);
+    expect(seen[1]?.auth).not.toBe(seen[0]?.auth);
+  });
+
+  it('ends the session when the refresh is refused and surfaces the 401', async () => {
+    startSession(issueToken(mockUser.id));
+    expireCurrentToken();
+    db.refreshCookieUser = null;
+
+    const error = await rejectionOf(api.GET('/auth/me'));
+
+    expect(error).toBeInstanceOf(ProblemError);
+    if (error instanceof ProblemError) expect(error.code).toBe('TOKEN_EXPIRED');
+    expect(getSession().status).toBe('anonymous');
+  });
+
+  it('does not refresh on other 401 codes', async () => {
+    const refreshes = countRefreshes();
+    startSession({
+      access_token: 'forged.token.value',
+      token_type: 'Bearer',
+      expires_in: 900,
+      user: mockUser,
+    });
+
+    const error = await rejectionOf(api.GET('/auth/me'));
+
+    expect(error).toBeInstanceOf(ProblemError);
+    if (error instanceof ProblemError) expect(error.code).toBe('UNAUTHENTICATED');
+    expect(refreshes.count).toBe(0);
+  });
+
+  it('sends the CSRF header on refresh and restores the session at boot', async () => {
+    db.refreshCookieUser = mockUser.id;
+    const seen: (string | null)[] = [];
+    server.events.on('request:start', ({ request }) => {
+      if (request.url.endsWith('/auth/refresh')) seen.push(request.headers.get('X-Requested-With'));
+    });
+
+    await restoreSession();
+
+    expect(seen).toEqual(['fetch']);
+    const session = getSession();
+    expect(session.status).toBe('authenticated');
+    if (session.status === 'authenticated') expect(session.user.id).toBe(mockUser.id);
+  });
+
+  it('settles as anonymous at boot without a refresh cookie', async () => {
+    await restoreSession();
+
+    expect(getSession().status).toBe('anonymous');
   });
 });

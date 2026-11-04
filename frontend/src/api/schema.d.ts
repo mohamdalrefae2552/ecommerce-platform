@@ -148,7 +148,10 @@ export interface paths {
          * List active products
          * @description Paginated, ordered by `created_at desc, id desc`. Optional filter by
          *     category slug and name search. An unknown category slug is a 422 on
-         *     `category` (no silent fallback). Each item carries its `stock`.
+         *     `category` (no silent fallback). Each item carries its `stock`, read
+         *     with ONE batched GetStock call for the whole page. When the inventory
+         *     does not answer in time the list still succeeds: every `stock` is
+         *     `unknown` and `meta.degraded` contains `inventory`.
          */
         get: operations["listProducts"];
         put?: never;
@@ -159,6 +162,12 @@ export interface paths {
          *     re-encoded to WebP (EXIF stripped), stored under a random ULID name and
          *     served from `/storage/products/{ulid}.webp`. Request bodies above 3 MB
          *     are rejected by `edge` with 413.
+         *
+         *     `initial_stock` (optional, default 0) is sent to the inventory service
+         *     with AdjustStock after the product is saved. If the inventory is down
+         *     the product is still created (201) with `stock.status = unknown`; the
+         *     admin sets the quantity later with `PUT /products/{productId}/stock`.
+         *     The main application never stores quantities.
          */
         post: operations["createProduct"];
         delete?: never;
@@ -182,15 +191,46 @@ export interface paths {
         };
         /**
          * Get one product with its current stock
-         * @description Until requirement 2 is delivered `stock` is always
-         *     `{status: unknown, available: null}`. From then on it asks the
-         *     inventory service for the quantity (R2-F2). When the
-         *     inventory is down or slow the page still answers 200 with
+         * @description Asks the inventory service for the quantity (R2-F2, GetStock with a
+         *     500 ms deadline). When the inventory is down or slow the page still answers 200 with
          *     `stock.status = unknown` (graceful degradation). Inactive or unknown
          *     products are 404.
          */
         get: operations["getProduct"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{productId}/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /**
+                 * @description Product ULID.
+                 * @example 01JC40A1B2C3D4E5F6G7H8J9KM
+                 */
+                productId: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Adjust the stock of a product (admin only)
+         * @description Inventory management (F-4, decision D-01): forwarded to the inventory
+         *     service as AdjustStock — the main application never stores
+         *     quantities. `delta` > 0 restocks, `delta` < 0 writes stock off.
+         *     A write-off larger than the available quantity is 409
+         *     `INSUFFICIENT_STOCK` and changes nothing.
+         *     `Idempotency-Key` is required: the same key and body return the same
+         *     result without applying the delta twice (200); the same key with a
+         *     different body is 422 `IDEMPOTENCY_KEY_REUSED`.
+         */
+        put: operations["adjustProductStock"];
         post?: never;
         delete?: never;
         options?: never;
@@ -216,9 +256,14 @@ export interface paths {
         put?: never;
         /**
          * Place an order (customers only)
-         * @description All lines are reserved in the inventory in one atomic call before the
-         *     order is saved; the order is never saved without the inventory's
-         *     approval. Idempotent with `Idempotency-Key`: same key and same body
+         * @description All lines are reserved in the inventory in one atomic call
+         *     (ReserveStock, 2 s deadline, total budget 3 s) before the order is
+         *     saved; the order is never saved without the inventory's approval
+         *     (R2-F1). Insufficient stock for any line is 409 with every short line
+         *     in `shortages` and nothing reserved (R2-E3). When the inventory is
+         *     down or too slow the answer is 503 within about 3 s, no order is
+         *     created and any possible reservation is released (R2-E2); retrying
+         *     with the same `Idempotency-Key` is safe. Idempotent with `Idempotency-Key`: same key and same body
          *     return the same order (201 first, 200 afterwards); same key with a
          *     different body is 422 `IDEMPOTENCY_KEY_REUSED`. Admins get 403.
          *     Rate limit: 10 per minute per user.
@@ -470,8 +515,7 @@ export interface components {
             data: components["schemas"]["Category"][];
         };
         /**
-         * @description Until requirement 2 this is always `unknown`/`null`.
-         *     Stock as reported by the inventory service. `unknown` with
+         * @description Stock as reported by the inventory service. `unknown` with
          *     `available: null` when the inventory is down or slower than its 500 ms
          *     deadline — the product response still succeeds.
          */
@@ -522,8 +566,39 @@ export interface components {
              */
             price_minor: number;
             category_id: components["schemas"]["Ulid"];
+            /**
+             * Format: int64
+             * @description Units to register in the inventory service; 0 registers nothing.
+             * @default 0
+             * @example 3
+             */
+            initial_stock: number;
             /** @description JPEG, PNG or WebP; at most 2 MB and 4000x4000 px. */
             image: string;
+        };
+        AdjustStockRequest: {
+            /**
+             * Format: int64
+             * @description Positive = restock, negative = write-off. Never 0.
+             * @example 10
+             */
+            delta: number;
+            /**
+             * @description Short audit note.
+             * @example توريد شحنة جديدة.
+             */
+            note?: string;
+        };
+        StockLevel: {
+            product_id: components["schemas"]["Ulid"];
+            /**
+             * Format: int64
+             * @example 13
+             */
+            available: number;
+        };
+        StockLevelEnvelope: {
+            data: components["schemas"]["StockLevel"];
         };
         ProductList: {
             data: components["schemas"]["Product"][];
@@ -631,6 +706,13 @@ export interface components {
             total: number;
             /** @example 3 */
             last_page: number;
+            /**
+             * @description Dependencies that did not answer in time; their fields hold fallback values (e.g. `stock.status = unknown`). Absent when everything answered.
+             * @example [
+             *       "inventory"
+             *     ]
+             */
+            degraded?: "inventory"[];
         };
         PaginationLinks: {
             /**
@@ -725,6 +807,28 @@ export interface components {
             errors: {
                 [key: string]: string[];
             };
+        };
+        Shortage: {
+            product_id: components["schemas"]["Ulid"];
+            /**
+             * @description Units the request needed (for a stock write-off, the units to remove).
+             * @example 2
+             */
+            requested: number;
+            /**
+             * Format: int64
+             * @example 1
+             */
+            available: number;
+        };
+        /** @description 409 `INSUFFICIENT_STOCK` problem listing every short line, ordered by product id. */
+        InsufficientStockProblem: components["schemas"]["Problem"] & {
+            shortages: components["schemas"]["Shortage"][];
+        };
+        /** @description 503 problem with the wait time in seconds (same as `Retry-After`). */
+        RetryableProblem: components["schemas"]["Problem"] & {
+            /** @example 5 */
+            retry_after: number;
         };
         /** @description 429 problem with the wait time in seconds (same as `Retry-After`). */
         RateLimitedProblem: components["schemas"]["Problem"] & {
@@ -986,6 +1090,55 @@ export interface components {
                 "application/problem+json": components["schemas"]["RateLimitedProblem"];
             };
         };
+        /** @description The inventory does not have enough units (`INSUFFICIENT_STOCK`). Nothing was reserved or changed. */
+        InsufficientStock: {
+            headers: {
+                "X-Request-Id": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                /**
+                 * @example {
+                 *       "type": "https://ecommerce.local/problems/insufficient-stock",
+                 *       "title": "Insufficient stock",
+                 *       "status": 409,
+                 *       "detail": "الكمية المتوفرة غير كافية لبعض المنتجات.",
+                 *       "instance": "/api/v1/orders",
+                 *       "code": "INSUFFICIENT_STOCK",
+                 *       "trace_id": "01JC3Z9A1B2C3D4E5F6G7H8J9K",
+                 *       "shortages": [
+                 *         {
+                 *           "product_id": "01JC40A1B2C3D4E5F6G7H8J9KM",
+                 *           "requested": 2,
+                 *           "available": 1
+                 *         }
+                 *       ]
+                 *     }
+                 */
+                "application/problem+json": components["schemas"]["InsufficientStockProblem"];
+            };
+        };
+        /** @description The inventory service is down (`INVENTORY_UNAVAILABLE`) or did not answer before the deadline (`INVENTORY_TIMEOUT`). Nothing was created or changed. */
+        InventoryUnavailable: {
+            headers: {
+                "X-Request-Id": components["headers"]["XRequestId"];
+                "Retry-After": components["headers"]["RetryAfter"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["RetryableProblem"];
+            };
+        };
+        /** @description Invalid adjustment (`VALIDATION_FAILED`) or the `Idempotency-Key` was re-used with a different body (`IDEMPOTENCY_KEY_REUSED`). */
+        StockAdjustUnprocessable: {
+            headers: {
+                "X-Request-Id": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ValidationProblem"] | components["schemas"]["Problem"];
+            };
+        };
         /** @description Unexpected server error (`INTERNAL_ERROR`). Never contains traces, SQL or file paths. */
         InternalError: {
             headers: {
@@ -1024,6 +1177,11 @@ export interface components {
          * @example 3f1c2a9e-6b7d-4c8e-9f10-2a3b4c5d6e7f
          */
         IdempotencyKey: string;
+        /**
+         * @description UUID chosen by the client per adjustment. Missing or not a UUID is 400 `MALFORMED_REQUEST`.
+         * @example 7b2e4c1a-9d3f-4e5a-8b6c-0d1e2f3a4b5c
+         */
+        IdempotencyKeyRequired: string;
         /**
          * @description CSRF guard for the cookie-authenticated refresh. Must be exactly `fetch`.
          * @example fetch
@@ -1386,6 +1544,7 @@ export interface operations {
                  *       "description": "شاشة 6.5 إنش وذاكرة 128 غيغابايت.",
                  *       "price_minor": 450000000,
                  *       "category_id": "01JC3Z0Y1E2C3T4R5N6C7S8A9B",
+                 *       "initial_stock": 3,
                  *       "image": "(binary)"
                  *     }
                  */
@@ -1490,6 +1649,67 @@ export interface operations {
             404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    adjustProductStock: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description UUID chosen by the client per adjustment. Missing or not a UUID is 400 `MALFORMED_REQUEST`.
+                 * @example 7b2e4c1a-9d3f-4e5a-8b6c-0d1e2f3a4b5c
+                 */
+                "Idempotency-Key": components["parameters"]["IdempotencyKeyRequired"];
+            };
+            path: {
+                /**
+                 * @description Product ULID.
+                 * @example 01JC40A1B2C3D4E5F6G7H8J9KM
+                 */
+                productId: components["parameters"]["ProductId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "delta": 10,
+                 *       "note": "توريد شحنة جديدة."
+                 *     }
+                 */
+                "application/json": components["schemas"]["AdjustStockRequest"];
+            };
+        };
+        responses: {
+            /** @description Stock after the adjustment (also returned for a replay). */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "data": {
+                     *         "product_id": "01JC40A1B2C3D4E5F6G7H8J9KM",
+                     *         "available": 13
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["StockLevelEnvelope"];
+                };
+            };
+            400: components["responses"]["MalformedRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["InsufficientStock"];
+            415: components["responses"]["UnsupportedMediaType"];
+            422: components["responses"]["StockAdjustUnprocessable"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["InventoryUnavailable"];
         };
     };
     listOrders: {
@@ -1625,10 +1845,12 @@ export interface operations {
             400: components["responses"]["MalformedRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["InsufficientStock"];
             415: components["responses"]["UnsupportedMediaType"];
             422: components["responses"]["CreateOrderUnprocessable"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["InventoryUnavailable"];
         };
     };
     getOrder: {

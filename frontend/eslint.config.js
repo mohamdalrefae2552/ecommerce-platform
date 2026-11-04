@@ -49,6 +49,7 @@ export default defineConfig([
         { name: 'localStorage', message: 'Never persist tokens or user data in localStorage.' },
       ],
       'no-restricted-properties': ['error', ...fetchBans, ...storageBans],
+      '@typescript-eslint/dot-notation': ['error', { allowIndexSignaturePropertyAccess: true }],
       'no-console': 'error',
     },
   },
