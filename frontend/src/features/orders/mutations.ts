@@ -19,6 +19,8 @@ export function useCreateOrder() {
       // Stock changed: product pages and lists must be re-read.
       void queryClient.invalidateQueries({ queryKey: ['products'] });
     },
+    // A refused order (e.g. 409 INSUFFICIENT_STOCK) means our stock numbers are stale.
+    onError: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 }
 

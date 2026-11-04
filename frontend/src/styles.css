@@ -721,3 +721,28 @@ nav[aria-label='تقسيم الصفحات'] {
     gap: 4px 14px;
   }
 }
+
+/* ---------- quantity picker & cart stock ---------- */
+.qty-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qty-picker button {
+  padding: 6px 12px;
+  min-width: 36px;
+}
+
+.qty-picker input[type='number'] {
+  width: 64px;
+  text-align: center;
+}
+
+.add-to-cart-box {
+  margin-top: 8px;
+}
+
+tr.line-short td {
+  background: var(--warn-bg);
+}

@@ -6,6 +6,7 @@ import { addToCart, clearCart } from '../features/cart/cart';
 import { PASSWORD, admin, customer, problem } from '../mocks/db';
 import { apiUrl, healthOk, json, problemResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
+import { stockIs } from './helpers';
 import { renderApp } from './renderApp';
 
 type Order = components['schemas']['Order'];
@@ -41,6 +42,8 @@ beforeEach(() => {
   clearCart();
   // The root layout shows the health indicator on every page.
   server.use(http.get(apiUrl('/health'), () => json(healthOk)));
+  // Cart lines read the live stock of their product.
+  stockIs(5);
 });
 
 function fillCart() {

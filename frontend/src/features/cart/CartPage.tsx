@@ -1,11 +1,21 @@
+import { useQueries } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
+import { ProblemError } from '../../api/problem';
 import { useSession } from '../../auth/session';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { showToast } from '../../components/toast';
 import { formatMinor } from '../../lib/format';
+import { productQuery } from '../catalog/queries';
 import { useCreateOrder } from '../orders/mutations';
-import { MAX_QUANTITY, clearCart, removeFromCart, setQuantity, useCart } from './cart';
+import {
+  MAX_QUANTITY,
+  applyAvailability,
+  clearCart,
+  removeFromCart,
+  setQuantity,
+  useCart,
+} from './cart';
 
 export function CartPage() {
   const lines = useCart();
@@ -16,6 +26,17 @@ export function CartPage() {
   // One Idempotency-Key per distinct cart content: retrying the same cart after a
   // timeout or a 503 re-sends the same key (no duplicate order); a changed cart gets a new one.
   const attempt = useRef<{ signature: string; key: string } | null>(null);
+
+  // Live stock per line (existing GET /products/{id}); the server stays the real check.
+  const stockQueries = useQueries({ queries: lines.map((l) => productQuery(l.productId)) });
+  const availableById = new Map<string, number>();
+  lines.forEach((l, i) => {
+    const stock = stockQueries[i]?.data?.stock;
+    if (stock?.status === 'in_stock' || stock?.status === 'out_of_stock') {
+      availableById.set(l.productId, stock.available ?? 0);
+    }
+  });
+  const shortages = createOrder.error instanceof ProblemError ? createOrder.error.shortages : [];
 
   const productNames = new Map(lines.map((l) => [l.productId, l.name]));
   const total = lines.reduce((sum, l) => sum + l.unitPriceMinor * l.quantity, 0);
@@ -62,40 +83,57 @@ export function CartPage() {
                 <th>المنتج</th>
                 <th>سعر الوحدة</th>
                 <th>الكمية</th>
+                <th>المتوفر الآن</th>
                 <th>الإجمالي</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {lines.map((l) => (
-                <tr key={l.productId}>
-                  <td>{l.name}</td>
-                  <td>{formatMinor(l.unitPriceMinor)}</td>
-                  <td>
-                    <input
-                      type="number"
-                      aria-label={`كمية ${l.name}`}
-                      min={1}
-                      max={MAX_QUANTITY}
-                      value={l.quantity}
-                      onChange={(e) => {
-                        setQuantity(l.productId, Number(e.target.value));
-                      }}
-                    />
-                  </td>
-                  <td>{formatMinor(l.unitPriceMinor * l.quantity)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        removeFromCart(l.productId);
-                      }}
-                    >
-                      حذف
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {lines.map((l) => {
+                const available = availableById.get(l.productId);
+                const tooMany = available !== undefined && l.quantity > available;
+                return (
+                  <tr key={l.productId} className={tooMany ? 'line-short' : undefined}>
+                    <td>{l.name}</td>
+                    <td>{formatMinor(l.unitPriceMinor)}</td>
+                    <td>
+                      <input
+                        type="number"
+                        aria-label={`كمية ${l.name}`}
+                        min={1}
+                        max={MAX_QUANTITY}
+                        value={l.quantity}
+                        onChange={(e) => {
+                          setQuantity(l.productId, Number(e.target.value));
+                        }}
+                      />
+                    </td>
+                    <td>
+                      {available === undefined ? (
+                        <span className="muted">غير معروف</span>
+                      ) : (
+                        <span>المتوفر الآن: {available}</span>
+                      )}
+                      {tooMany && (
+                        <p role="alert" className="degraded">
+                          الكمية المطلوبة أكبر من المتوفر
+                        </p>
+                      )}
+                    </td>
+                    <td>{formatMinor(l.unitPriceMinor * l.quantity)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeFromCart(l.productId);
+                        }}
+                      >
+                        حذف
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <p>المجموع: {formatMinor(total)}</p>
@@ -110,6 +148,19 @@ export function CartPage() {
           )}
           {createOrder.error !== null && (
             <ErrorNotice error={createOrder.error} productNames={productNames} />
+          )}
+          {shortages.length > 0 && (
+            <p>
+              <button
+                type="button"
+                onClick={() => {
+                  applyAvailability(shortages);
+                  createOrder.reset();
+                }}
+              >
+                اطلب المتوفر فقط
+              </button>
+            </p>
           )}
           {elapsedMs !== null && <p>زمن استجابة آخر محاولة: {elapsedMs} مللي ثانية</p>}
           <button
