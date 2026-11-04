@@ -68,7 +68,8 @@ jobs:
           fetch-depth: 0 # buf breaking compares against main
       - name: Fetch main for the breaking-change check
         run: git fetch --no-tags origin main:refs/remotes/origin/main
-      - run: cp .env.example .env
+      # make gen bind-mounts the pnpm/gradle caches (compose.ci.yaml).
+      - run: mkdir -p .cache/pnpm .cache/gradle && cp .env.example .env
       - run: make lint-contracts
       - name: Generated code is up to date
         if: hashFiles('backend/api/composer.json') != ''
