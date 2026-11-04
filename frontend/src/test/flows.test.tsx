@@ -230,3 +230,51 @@ describe('admin order management', () => {
     ).toBeDefined();
   });
 });
+
+describe('admin dashboard', () => {
+  it('makes the stock 1 with a delta computed from the current quantity', async () => {
+    let sent: unknown = null;
+    let key: string | null = null;
+    const product = {
+      id: PRODUCT_ID,
+      name: 'هاتف ذكي X200',
+      description: 'وصف',
+      price: { amount_minor: 450000000, currency: 'SYP' },
+      category: { id: '01JC3Z0Y1E2C3T4R5N6C7S8A9B', slug: 'electronics', name: 'إلكترونيات' },
+      image_url: 'http://localhost:8080/storage/products/x.webp',
+      stock: { status: 'in_stock', available: 5 },
+      created_at: '2026-11-01T17:41:00Z',
+    };
+    server.use(
+      http.get(apiUrl('/categories'), () => json({ data: [] })),
+      http.get(apiUrl('/products'), () =>
+        json({
+          data: [product],
+          meta: { page: 1, per_page: 12, total: 1, last_page: 1 },
+          links: { first: '', prev: null, next: null, last: '' },
+        }),
+      ),
+      http.get(apiUrl('/orders'), () =>
+        json({
+          data: [],
+          meta: { page: 1, per_page: 20, total: 0, last_page: 1 },
+          links: { first: '', prev: null, next: null, last: '' },
+        }),
+      ),
+      http.put(apiUrl(`/products/${PRODUCT_ID}/stock`), async ({ request }) => {
+        sent = await request.json();
+        key = request.headers.get('Idempotency-Key');
+        return json({ data: { product_id: PRODUCT_ID, available: 1 } });
+      }),
+    );
+    renderApp('/admin', { as: admin });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'اجعل المخزون 1' }));
+
+    await waitFor(() => {
+      expect(sent).toEqual({ delta: -4 });
+    });
+    expect(key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(await screen.findByText('تم تحديث المخزون إلى 1')).toBeDefined();
+  });
+});

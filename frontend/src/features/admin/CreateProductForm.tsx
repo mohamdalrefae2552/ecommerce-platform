@@ -1,13 +1,24 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { Link } from '@tanstack/react-router';
 import { type SyntheticEvent, useState } from 'react';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Field, type FieldErrors, serverFieldErrors } from '../../components/forms';
+import { StockBadge } from '../../components/StockBadge';
+import { showToast } from '../../components/toast';
+import { formatMoney, imagePath } from '../../lib/format';
 import { categoriesQuery } from '../catalog/queries';
 import { useCreateProduct } from './mutations';
 
-export function CreateProductPage() {
-  const navigate = useNavigate();
+/** Reads the picked file as a data: URL (CSP img-src allows 'self' and data: only). */
+function readPreview(file: File, done: (url: string | null) => void): void {
+  const reader = new FileReader();
+  reader.onload = () => {
+    done(typeof reader.result === 'string' ? reader.result : null);
+  };
+  reader.readAsDataURL(file);
+}
+
+export function CreateProductForm() {
   const queryClient = useQueryClient();
   const categories = useQuery(categoriesQuery);
   const create = useCreateProduct();
@@ -17,6 +28,7 @@ export function CreateProductPage() {
   const [categoryId, setCategoryId] = useState('');
   const [initialStock, setInitialStock] = useState('0');
   const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
 
   const errors = { ...serverFieldErrors(create.error), ...clientErrors };
@@ -46,18 +58,40 @@ export function CreateProductPage() {
         image,
       },
       {
-        onSuccess: ({ data }) => {
+        onSuccess: () => {
+          showToast('تمت إضافة المنتج');
           void queryClient.invalidateQueries({ queryKey: ['products'] });
-          void navigate({ to: '/products/$productId', params: { productId: data.id } });
+          setName('');
+          setDescription('');
+          setPrice('');
+          setInitialStock('0');
+          setImage(null);
+          setPreview(null);
         },
       },
     );
   }
 
+  const created = create.isSuccess ? create.data.data : null;
+
   return (
     <section>
-      <h1>إضافة منتج</h1>
+      <h2>١. إضافة منتج</h2>
       {create.error !== null && <ErrorNotice error={create.error} />}
+      {created !== null && (
+        <div className="card created">
+          <p className="success">تمت إضافة المنتج</p>
+          <img src={imagePath(created.image_url)} alt={created.name} />
+          <h3>{created.name}</h3>
+          <p className="price">{formatMoney(created.price)}</p>
+          <p>
+            <StockBadge stock={created.stock} />
+          </p>
+          <Link to="/products/$productId" params={{ productId: created.id }}>
+            فتح صفحة المنتج
+          </Link>
+        </div>
+      )}
       <form onSubmit={onSubmit} noValidate>
         <Field label="الاسم" errors={errors['name']}>
           {(props) => (
@@ -134,11 +168,15 @@ export function CreateProductPage() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => {
-                setImage(e.target.files?.[0] ?? null);
+                const file = e.target.files?.[0] ?? null;
+                setImage(file);
+                setPreview(null);
+                if (file !== null) readPreview(file, setPreview);
               }}
             />
           )}
         </Field>
+        {preview !== null && <img className="detail-img" src={preview} alt="معاينة الصورة" />}
         <button type="submit" disabled={create.isPending}>
           {create.isPending ? 'جارٍ الحفظ…' : 'حفظ المنتج'}
         </button>

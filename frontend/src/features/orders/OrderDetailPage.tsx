@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useSession } from '../../auth/session';
 import { ProblemError } from '../../api/problem';
+import { showToast } from '../../components/toast';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { formatDate, formatMoney } from '../../lib/format';
 import { DemoStatusAttempt } from './DemoStatusAttempt';
@@ -45,6 +46,7 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
           onClick={() => {
             void navigator.clipboard.writeText(order.id).then(() => {
               setCopied(true);
+              showToast('تم نسخ رقم الطلب');
             });
           }}
         >

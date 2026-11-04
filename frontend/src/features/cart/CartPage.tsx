@@ -2,6 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 import { useSession } from '../../auth/session';
 import { ErrorNotice } from '../../components/ErrorNotice';
+import { showToast } from '../../components/toast';
 import { formatMinor } from '../../lib/format';
 import { useCreateOrder } from '../orders/mutations';
 import { MAX_QUANTITY, clearCart, removeFromCart, setQuantity, useCart } from './cart';
@@ -35,6 +36,7 @@ export function CartPage() {
         },
         onSuccess: ({ data }) => {
           attempt.current = null;
+          showToast('تم إنشاء الطلب');
           clearCart();
           void navigate({ to: '/orders/$orderId', params: { orderId: data.id } });
         },

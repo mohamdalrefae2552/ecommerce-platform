@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, requireData } from '../../api/client';
 import type { components } from '../../api/schema';
+import { showToast } from '../../components/toast';
 import { orderKeys } from './queries';
 import type { OrderStatus } from './status';
 
@@ -31,6 +32,9 @@ export function useChangeOrderStatus(orderId: string) {
           body: { status },
         }),
       ),
+    onSuccess: () => {
+      showToast('تم تغيير الحالة');
+    },
     // Success or failure (e.g. 409 because someone else already moved it): re-read the truth.
     onSettled: () => queryClient.invalidateQueries({ queryKey: orderKeys.all }),
   });

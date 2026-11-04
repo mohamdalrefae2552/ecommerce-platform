@@ -308,3 +308,100 @@ nav[aria-label='تقسيم الصفحات'] {
   padding: 0;
   margin: 12px 0;
 }
+
+header {
+  background: #14316b;
+  border-bottom: 0;
+}
+
+header a {
+  color: #e8eefc;
+}
+
+header nav button {
+  background: transparent;
+  color: #fff;
+  border-color: #8fa6d8;
+}
+
+header .muted {
+  color: #b8c6e8;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.brand a {
+  color: #fff;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.badge-admin {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.badge-customer {
+  background: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.toasts {
+  position: fixed;
+  bottom: 16px;
+  inset-inline-start: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 10;
+}
+
+.toast {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--ok);
+  color: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 25%);
+}
+
+.stock-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.stock-control input {
+  width: 80px;
+}
+
+.created {
+  max-width: 280px;
+  margin-bottom: 16px;
+}
+
+.guide section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 20px 12px;
+}
+
+.guide h3 {
+  margin: 16px 0 4px;
+  font-size: 1rem;
+}
+
+.guide code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  background: var(--bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+}

@@ -2,9 +2,10 @@ import type { QueryClient } from '@tanstack/react-query';
 import { Link, Outlet, createRootRouteWithContext, useNavigate } from '@tanstack/react-router';
 import { useSession } from '../auth/session';
 import { ErrorNotice } from '../components/ErrorNotice';
-import { useCart, clearCart } from '../features/cart/cart';
-import { HealthStatus } from '../features/health/HealthStatus';
+import { Toaster } from '../components/toast';
 import { useLogout } from '../features/auth/mutations';
+import { clearCart, useCart } from '../features/cart/cart';
+import { HealthStatus } from '../features/health/HealthStatus';
 
 export interface RouterContext {
   readonly queryClient: QueryClient;
@@ -22,21 +23,43 @@ function Navigation() {
   const navigate = useNavigate();
   const cart = useCart();
 
-  if (session.status === 'restoring') return <p role="status">جارٍ التحقق من الجلسة…</p>;
+  const isAdmin = session.status === 'authenticated' && session.user.role === 'admin';
 
   return (
     <nav aria-label="القائمة الرئيسية">
       <ul>
+        <li className="brand">
+          <Link to="/products" search={{ page: 1 }}>
+            متجر التجربة
+          </Link>
+        </li>
         <li>
           <Link to="/products" search={{ page: 1 }}>
             المنتجات
           </Link>
         </li>
-        {session.status !== 'authenticated' || session.user.role === 'customer' ? (
+        {!isAdmin && (
           <li>
             <Link to="/cart">السلة ({cart.length})</Link>
           </li>
-        ) : null}
+        )}
+        {session.status === 'authenticated' && (
+          <li>
+            <Link to="/orders" search={{ page: 1 }}>
+              {isAdmin ? 'كل الطلبات' : 'طلباتي'}
+            </Link>
+          </li>
+        )}
+        {isAdmin && (
+          <li>
+            <Link to="/admin">لوحة المسؤول</Link>
+          </li>
+        )}
+        <li>
+          <Link to="/guide">دليل العرض</Link>
+        </li>
+        <li className="spacer" />
+        {session.status === 'restoring' && <li className="muted">جارٍ التحقق من الجلسة…</li>}
         {session.status === 'anonymous' && (
           <>
             <li>
@@ -50,19 +73,10 @@ function Navigation() {
         {session.status === 'authenticated' && (
           <>
             <li>
-              <Link to="/orders" search={{ page: 1 }}>
-                {session.user.role === 'admin' ? 'كل الطلبات' : 'طلباتي'}
-              </Link>
-            </li>
-            {session.user.role === 'admin' && (
-              <li>
-                <Link to="/admin/products/new">إضافة منتج</Link>
-              </li>
-            )}
-            <li>
-              <Link to="/account">
-                {session.user.name} ({session.user.role === 'admin' ? 'مسؤول' : 'زبون'})
-              </Link>
+              <Link to="/account">{session.user.name}</Link>{' '}
+              <span className={`badge ${isAdmin ? 'badge-admin' : 'badge-customer'}`}>
+                {isAdmin ? 'مسؤول' : 'زبون'}
+              </span>
             </li>
             <li>
               <button
@@ -99,6 +113,7 @@ function RootLayout() {
       <footer>
         <HealthStatus />
       </footer>
+      <Toaster />
     </>
   );
 }

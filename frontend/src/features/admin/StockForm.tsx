@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type SyntheticEvent, useRef, useState } from 'react';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Field, serverFieldErrors } from '../../components/forms';
+import { showToast } from '../../components/toast';
 import { catalogKeys } from '../catalog/queries';
 import { useAdjustStock } from './mutations';
 
@@ -34,7 +35,8 @@ export function StockForm({ productId }: { readonly productId: string }) {
     adjust.mutate(
       { body, key: attempt.current.key },
       {
-        onSuccess: () => {
+        onSuccess: ({ data }) => {
+          showToast(`تم تحديث المخزون إلى ${String(data.available)}`);
           attempt.current = null;
           setDelta('');
           setNote('');

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { components } from '../../api/schema';
+import { showToast } from '../../components/toast';
 import { addToCart } from '../cart/cart';
 
 type Product = components['schemas']['Product'];
@@ -18,6 +19,7 @@ export function AddToCartButton({ product }: { readonly product: Product }) {
             unitPriceMinor: product.price.amount_minor,
           });
           setAdded(true);
+          showToast('تمت إضافة المنتج إلى السلة');
         }}
       >
         أضف إلى السلة
