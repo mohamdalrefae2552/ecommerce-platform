@@ -296,3 +296,70 @@ UPDATE stock_items SET available = available - :quantity ...   -- ② يخصم
 6. لماذا JWT قصير + refresh يتبدل؟ (§5.3)
 
 **نصيحة:** كل عضو يشغّل السيناريو كاملاً بيده مرة على الأقل قبل المقابلة، ويفتح الملفات المذكورة هنا ويقرأ الدالة المهمة في كل منها.
+
+---
+
+## 12. التواصل بين Laravel و Spring Boot بالتفصيل (أهم قسم للمقابلة)
+
+### 12.1 مسار النداء الواحد من البداية للنهاية
+```
+المتصفح → edge (nginx) → api (Laravel)
+   → GrpcInventoryGateway::reserve()          [backend/api/app/Shared/Inventory/Grpc/GrpcInventoryGateway.php]
+   → InventoryServiceClient (كود مولَّد)       [backend/api/generated/grpc/...]
+   → HTTP/2 + Protobuf (ثنائي، ليس JSON)
+   → toxiproxy:50051  (وسيط حقن الأعطال)
+   → inventory:9090   (Spring Boot gRPC server)
+   → RequestIdServerInterceptor → InventoryGrpcService → RequestValidator → CallBudget
+   → ReservationService (transaction) → StockRepository (SELECT … FOR UPDATE)
+   → db-inventory (PostgreSQL)
+```
+
+### 12.2 لماذا gRPC وليس REST بين الخدمتين؟
+| | gRPC | REST/JSON |
+|---|---|---|
+| العقد | ملف `.proto` صارم يولّد كود الطرفين ⇒ خطأ في اسم حقل = خطأ في البناء | توثيق قد يختلف عن الكود |
+| الصيغة | Protobuf ثنائي، أصغر وأسرع | نص JSON |
+| النقل | HTTP/2: اتصال واحد لطلبات كثيرة | HTTP/1.1 غالباً |
+| المهل | **Deadline** مدمج في البروتوكول ويُنقل للخادم | يُبنى يدوياً |
+| رموز الأخطاء | `UNAVAILABLE`, `DEADLINE_EXCEEDED`, `INVALID_ARGUMENT`… واضحة | رموز HTTP عامة |
+
+### 12.3 كيف يُولَّد الكود من العقد؟
+- **Spring:** إضافة Gradle `com.google.protobuf` تقرأ `contracts/proto` وقت البناء وتولّد `InventoryServiceGrpc` + الرسائل (لا تُحفظ في git).
+- **Laravel:** `make gen` يشغّل `buf generate` بإضافتي `protocolbuffers/php` و `grpc/php` ⇒ `backend/api/generated/grpc/` (محفوظ في git، والـ CI يتحقق أنه مطابق للعقد).
+- **`buf breaking`** في الـ CI يمنع أي تغيير يكسر التوافق (مثلاً تغيير رقم حقل).
+
+### 12.4 كل نداء له مهلة (Deadline) — ولماذا هذه القيم
+- في Laravel: `['timeout' => $deadlineMs * 1000]` على كل نداء؛ القيم من متغيرات البيئة `INVENTORY_DEADLINE_*`.
+- **GetStock 500ms:** قراءة لعرض الصفحة — إن تأخرت نعرض الصفحة بلا كمية ("غير متاحة حالياً") بدل أن تتعطل.
+- **ReserveStock 2000ms + ميزانية كلية 3000ms:** إنشاء الطلب لا يتجاوز ~3 ثوانٍ مهما حدث.
+- **إعادة المحاولة مرة واحدة فقط** عند `UNAVAILABLE` وبشرط بقاء ≥ 1000ms من الميزانية. **آمنة** لأن `ReserveStock` idempotent بنفس `reservation_id`: لو وصل الطلب الأول فعلاً وحجز، الثاني يعيد نفس النتيجة ولا يحجز مرتين.
+- **في Spring:** `CallBudget` يفحص المهلة المتبقية **قبل** فتح الـ transaction؛ إن انتهت لا يغيّر شيئاً. و PostgreSQL له `lock_timeout=1500ms` و `statement_timeout=1800ms` — أقل من مهلة العميل، فالخادم لا يبقى يعمل بعد أن استسلم العميل.
+
+### 12.5 تحويل أخطاء gRPC إلى رد للمستخدم (Laravel)
+| رمز gRPC من Spring | الاستثناء في Laravel | رد المستخدم |
+|---|---|---|
+| `OK` + `RESERVE_OUTCOME_INSUFFICIENT_STOCK` | `InsufficientStock` | **409** + قائمة النواقص |
+| `DEADLINE_EXCEEDED` | `InventoryTimeout` | **503** `INVENTORY_TIMEOUT` |
+| `UNAVAILABLE`, `ABORTED`, `RESOURCE_EXHAUSTED`, `CANCELLED` | `InventoryUnavailable` | **503** `INVENTORY_UNAVAILABLE` + `Retry-After: 5` |
+| `INVALID_ARGUMENT` وغيره | `InventoryContractViolation` | **500** ويُسجَّل كخطأ برمجي |
+
+**لماذا "الكمية غير كافية" ليست خطأ gRPC؟** لأنها نتيجة عمل متوقعة لا عطل. لو كانت خطأ لاختلطت بمنطق إعادة المحاولة — ونحن **لا نعيد** محاولة "غير كافية" أبداً.
+
+### 12.6 ماذا لو انتهت المهلة والمستودع كان قد حجز فعلاً؟ (سؤال صعب متوقع)
+النتيجة **مجهولة**: ربما حجز وربما لا. لذلك Laravel يرسل `ReleaseStock` فوراً بنفس `reservation_id` (الإرجاع idempotent: إن لم يكن هناك حجز لا يحدث شيء).
+وإن وصل `ReleaseStock` **قبل** `ReserveStock` المتأخر (الشبكة قد تعكس الترتيب)؟ Spring يكتب **tombstone** (شاهد قبر) لهذا الـ `reservation_id`، فعندما يصل الحجز المتأخر يرفضه بـ `RESERVATION_ALREADY_RELEASED`. لا تضيع قطعة ولا تُحجز بلا طلب.
+
+### 12.7 تتبع الطلب عبر الخدمتين
+كل طلب HTTP يحمل `X-Request-Id`؛ Laravel يمرره كـ gRPC metadata `x-request-id`، و `RequestIdServerInterceptor` في Spring يضعه في سجلاته. فخطأ واحد يمكن تتبعه في سجلات الخدمتين بنفس الرقم (تمهيد للمتطلب 6: المراقبة).
+
+### 12.8 العزل
+- `api` على شبكة `app-net` فقط؛ `db-inventory` على `inventory-net` فقط ⇒ Laravel **لا يستطيع** الوصول لقاعدة المخزون (جرّب: `docker compose exec api getent hosts db-inventory` يفشل).
+- الطريق الوحيد بينهما: gRPC عبر `toxiproxy` ← `inventory`.
+
+### 12.9 أسئلة سريعة عن التواصل
+1. **ما الملف المشترك بين الخدمتين؟** `contracts/proto/inventory/v1/inventory.proto` فقط.
+2. **ماذا يحدث لو أوقفت Spring؟** صفحات المنتجات تعمل بكمية "غير متاحة"، وإنشاء الطلب 503 خلال أقل من ثانية، ولا يُحفظ أي طلب.
+3. **لماذا toxiproxy؟** لنثبت المهل والأعطال فعلياً (`make chaos-latency MS=3000`) بدل ادعائها.
+4. **كيف تمنع الحجز مرتين عند إعادة المحاولة؟** `reservation_id` ثابت لكل محاولة طلب + الخادم idempotent عليه.
+5. **لماذا طلب واحد لكل المنتجات؟** كي يكون الحجز ذرياً (كله أو لا شيء) داخل transaction واحدة في Spring.
+6. **أين يُخزَّن المخزون؟** في `db-inventory` فقط (جداول `stock_items`, `reservations`, `reservation_lines`, `stock_adjustments`). Laravel لا يملك أي عمود كمية.
