@@ -6,6 +6,8 @@ namespace App\Modules\Users\Providers;
 
 use App\Modules\Users\Console\CreateAdmin;
 use App\Modules\Users\Console\IssueExpiredToken;
+use App\Modules\Users\Contracts\UserDirectory;
+use App\Modules\Users\Directory\EloquentUserDirectory;
 use App\Shared\Providers\ModuleServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -13,6 +15,11 @@ use Illuminate\Support\Facades\RateLimiter;
 
 final class UsersServiceProvider extends ModuleServiceProvider
 {
+    /**
+     * @var array<class-string, class-string>
+     */
+    public array $singletons = [UserDirectory::class => EloquentUserDirectory::class];
+
     /**
      * Cache key of the per-(email, IP) login limiter as ThrottleRequests
      * stores it (keys are not hashed: AuthServiceProvider), so a successful
