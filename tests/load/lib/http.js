@@ -5,7 +5,10 @@ import { API_URL, REQUEST_TIMEOUT } from './config.js';
 // Unique per VU and iteration: also used as X-Request-Id so a request can be
 // found in the edge/api logs.
 export function requestId(prefix = 'k6') {
-  return `${prefix}-${__VU}-${__ITER}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  // __VU/__ITER do not exist in setup(), where the load scripts also call this.
+  const vu = typeof __VU === 'undefined' ? 0 : __VU;
+  const iter = typeof __ITER === 'undefined' ? 0 : __ITER;
+  return `${prefix}-${vu}-${iter}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function params({ token, headers = {}, tags = {} } = {}) {
