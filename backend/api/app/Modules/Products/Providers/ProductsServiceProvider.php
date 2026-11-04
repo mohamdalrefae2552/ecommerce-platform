@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Products\Providers;
 
 use App\Modules\Products\Catalog\EloquentProductCatalog;
+use App\Modules\Products\Console\CreateDemoCatalog;
 use App\Modules\Products\Contracts\ProductCatalog;
 use App\Modules\Products\Models\Product;
 use App\Modules\Products\Policies\ProductPolicy;
@@ -20,6 +21,15 @@ final class ProductsServiceProvider extends ModuleServiceProvider
     protected function modulePath(): string
     {
         return dirname(__DIR__);
+    }
+
+    public function boot(): void
+    {
+        parent::boot();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([CreateDemoCatalog::class]);
+        }
     }
 
     protected function policies(): array
