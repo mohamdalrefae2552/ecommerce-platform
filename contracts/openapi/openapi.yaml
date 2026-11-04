@@ -1774,7 +1774,7 @@ components:
         quantity:
           type: integer
           minimum: 1
-          maximum: 10
+          maximum: 100
           example: 1
         line_total:
           $ref: '#/components/schemas/Money'
@@ -1891,7 +1891,7 @@ components:
               quantity:
                 type: integer
                 minimum: 1
-                maximum: 10
+                maximum: 100
                 example: 1
     ChangeOrderStatusRequest:
       type: object

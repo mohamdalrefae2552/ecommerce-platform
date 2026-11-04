@@ -112,7 +112,7 @@
 ### Orders
 | Method | Path | Body | Success |
 |---|---|---|---|
-| POST | `/orders` | `{items:[{product_id, quantity}]}` (1..20 بنداً، quantity 1..10، بلا تكرار) + `Idempotency-Key` | 201 |
+| POST | `/orders` | `{items:[{product_id, quantity}]}` (1..20 بنداً، quantity 1..100، بلا تكرار) + `Idempotency-Key` | 201 |
 | GET | `/orders?status&page&per_page` | | 200 — ملخص لكل طلب (`id, user_id, status, total, item_count, created_at, updated_at`) بلا بنود ولا سجل |
 | GET | `/orders/{id}` | | 200 مع `items`, `total`, `status`, `status_history` (كل عنصر: `from, to, actor_role, note, at` — معرّف المنفّذ يُخزَّن ولا يُعرض، API3) |
 | PATCH | `/orders/{id}/status` | `{status, note?}` (`note` ≤ 500) | 200 |
