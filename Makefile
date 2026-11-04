@@ -143,7 +143,7 @@ verify-e2e: ## Playwright E2E against the running stack (run `make up` first)
 race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [N=50]
 	$(need_docker)
 	$(call need,tests/load/race.js,P2-QA-01)
-	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run /work/tests/load/race.js
+	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run --quiet /work/tests/load/race.js
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/race-verify.sh
 
 demo-r1: ## Interview demo, requirement 1 (IDOR, 403, rate limit, JWT, headers)
