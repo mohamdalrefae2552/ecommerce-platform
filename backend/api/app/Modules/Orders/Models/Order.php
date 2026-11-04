@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $currency
  * @property string|null $idempotency_key
  * @property string|null $request_hash
+ * @property string|null $reservation_id
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property Collection<int, OrderItem> $items

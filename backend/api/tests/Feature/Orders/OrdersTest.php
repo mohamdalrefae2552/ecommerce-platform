@@ -15,6 +15,7 @@ use function Pest\Laravel\postJson;
 
 beforeEach(function (): void {
     Mail::fake();
+    inventory()->defaultAvailable = 100;
 });
 
 it('creates an order with a price snapshot, 201 and Location', function (): void {

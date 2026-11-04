@@ -32,6 +32,9 @@ final class FakeInventoryGateway implements InventoryGateway
 
     public int $stockCalls = 0;
 
+    /** Units of every product not set explicitly (null: untracked, 0 units). */
+    public ?int $defaultAvailable = null;
+
     /** @var array<string, Throwable> */
     private array $failures = [];
 
@@ -56,7 +59,7 @@ final class FakeInventoryGateway implements InventoryGateway
 
         $levels = [];
         foreach ($productIds as $id) {
-            $levels[$id] = new StockLevel($id, $this->available[$id] ?? 0, isset($this->available[$id]));
+            $levels[$id] = new StockLevel($id, $this->units($id), isset($this->available[$id]) || $this->defaultAvailable !== null);
         }
 
         return $levels;
@@ -68,7 +71,7 @@ final class FakeInventoryGateway implements InventoryGateway
 
         $shortages = [];
         foreach ($lines as $line) {
-            $available = $this->available[$line->productId] ?? 0;
+            $available = $this->units($line->productId);
             if ($available < $line->quantity) {
                 $shortages[] = new Shortage($line->productId, $line->quantity, $available);
             }
@@ -79,7 +82,7 @@ final class FakeInventoryGateway implements InventoryGateway
         }
 
         foreach ($lines as $line) {
-            $this->available[$line->productId] = ($this->available[$line->productId] ?? 0) - $line->quantity;
+            $this->available[$line->productId] = $this->units($line->productId) - $line->quantity;
         }
 
         $this->reservations[$reservationId] = $lines;
@@ -91,7 +94,7 @@ final class FakeInventoryGateway implements InventoryGateway
         $this->maybeFail('release');
 
         foreach ($this->reservations[$reservationId] ?? [] as $line) {
-            $this->available[$line->productId] = ($this->available[$line->productId] ?? 0) + $line->quantity;
+            $this->available[$line->productId] = $this->units($line->productId) + $line->quantity;
         }
 
         unset($this->reservations[$reservationId]);
@@ -102,12 +105,17 @@ final class FakeInventoryGateway implements InventoryGateway
         $this->adjustments[] = [$adjustmentId, $productId, $delta];
         $this->maybeFail('adjust');
 
-        $available = $this->available[$productId] ?? 0;
+        $available = $this->units($productId);
         if ($available + $delta < 0) {
             throw new InsufficientStock([new Shortage($productId, abs($delta), $available)]);
         }
 
         return $this->available[$productId] = $available + $delta;
+    }
+
+    private function units(string $productId): int
+    {
+        return $this->available[$productId] ?? $this->defaultAvailable ?? 0;
     }
 
     private function maybeFail(string $operation): void

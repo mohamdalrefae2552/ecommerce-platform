@@ -22,6 +22,7 @@ final class CreateProductRequest extends StrictFormRequest
             'description' => ['bail', 'sometimes', 'nullable', 'string', 'max:2000'],
             'price_minor' => ['bail', 'required', 'integer', 'min:1', 'max:100000000000'],
             'category_id' => ['bail', 'required', 'string', 'ulid', Rule::exists('categories', 'id')],
+            'initial_stock' => ['bail', 'sometimes', 'integer', 'min:0', 'max:1000000'],
             'image' => ['bail', 'required', 'file', 'mimetypes:image/jpeg,image/png,image/webp', 'max:2048', 'dimensions:max_width=4000,max_height=4000'],
         ];
     }

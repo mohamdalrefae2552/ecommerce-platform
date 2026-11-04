@@ -44,6 +44,7 @@ function createProduct(array $fields, array $headers = []): TestResponse
 function productFields(Category $category, array $overrides = []): array
 {
     return [
+        'initial_stock' => '3',
         'name' => 'هاتف ذكي X200',
         'description' => 'شاشة 6.5 إنش.',
         'price_minor' => '450000000',
@@ -70,10 +71,11 @@ it('lets an admin add a product with its image re-encoded to WebP', function ():
         ->assertJsonPath('data.price.amount_minor', 450000000)
         ->assertJsonPath('data.price.currency', 'SYP')
         ->assertJsonPath('data.category.id', $category->id)
-        ->assertJsonPath('data.stock.status', 'unknown')
+        ->assertJsonPath('data.stock', ['status' => 'in_stock', 'available' => 3])
         ->assertMatchesContract();
 
     $product = Product::query()->sole();
+    expect(inventory()->adjustments)->toHaveCount(1)->and(inventory()->adjustments[0][2])->toBe(3);
     $response->assertHeader('Location', url('/api/v1/products/'.$product->id));
     expect($product->image)->toMatch('/^[0-9A-HJKMNP-TV-Z]{26}\.webp$/')
         ->and($response->json('data.image_url'))->toBe('http://localhost:8080/storage/products/'.$product->image);
@@ -134,9 +136,9 @@ it('lists products newest first with the contract pagination envelope', function
         ->assertJsonPath('data.1.id', $products[1]->id)
         ->assertJsonPath('meta.total', 3)
         ->assertJsonPath('meta.last_page', 2)
-        ->assertJsonPath('meta.degraded', ['inventory'])
+        ->assertJsonMissingPath('meta.degraded')
         ->assertJsonPath('links.prev', null)
-        ->assertJsonPath('data.0.stock', ['status' => 'unknown', 'available' => null])
+        ->assertJsonPath('data.0.stock', ['status' => 'out_of_stock', 'available' => 0])
         ->assertMatchesContract();
 
     $next = $response->json('links.next');
@@ -174,11 +176,12 @@ it('rejects invalid list parameters with 422 instead of clamping', function (str
 
 it('shows one product with its stock', function (): void {
     $product = Product::factory()->create();
+    inventory()->setStock($product->id, 4);
 
     getJson('/api/v1/products/'.$product->id)
         ->assertOk()
         ->assertJsonPath('data.id', $product->id)
-        ->assertJsonPath('data.stock.status', 'unknown')
+        ->assertJsonPath('data.stock', ['status' => 'in_stock', 'available' => 4])
         ->assertMatchesContract();
 });
 

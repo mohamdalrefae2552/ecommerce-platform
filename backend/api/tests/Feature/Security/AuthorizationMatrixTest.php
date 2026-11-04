@@ -40,6 +40,7 @@ function authorizationMatrix(): array
         'categories' => ['GET', '/api/v1/categories', [], ['guest' => 200, 'owner' => 200, 'other' => 200, 'admin' => 200]],
         'products' => ['GET', '/api/v1/products', [], ['guest' => 200, 'owner' => 200, 'other' => 200, 'admin' => 200]],
         'product' => ['GET', '/api/v1/products/{product}', [], ['guest' => 200, 'owner' => 200, 'other' => 200, 'admin' => 200]],
+        'adjust stock (role checked before the body)' => ['PUT', '/api/v1/products/{product}/stock', [], ['guest' => 401, 'owner' => 403, 'other' => 403, 'admin' => 400]],
         'create product (role checked before the body)' => ['POST', '/api/v1/products', [], ['guest' => 401, 'owner' => 403, 'other' => 403, 'admin' => 422]],
         'create order' => ['POST', '/api/v1/orders', $line, ['guest' => 401, 'owner' => 201, 'other' => 201, 'admin' => 403]],
         'list orders' => ['GET', '/api/v1/orders', [], ['guest' => 401, 'owner' => 200, 'other' => 200, 'admin' => 200]],
@@ -60,6 +61,7 @@ dataset('authorization', function (): Generator {
 
 it('enforces the authorization matrix', function (string $method, string $uri, array $body, string $caller, int $status): void {
     Mail::fake();
+    inventory()->defaultAvailable = 100;
     $owner = User::factory()->create();
     $callers = ['guest' => null, 'owner' => $owner, 'other' => User::factory()->create(), 'admin' => User::factory()->admin()->create()];
     $product = Product::factory()->create();

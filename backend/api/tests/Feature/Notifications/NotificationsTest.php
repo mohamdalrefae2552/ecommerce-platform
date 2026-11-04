@@ -17,6 +17,7 @@ use function Pest\Laravel\postJson;
 
 beforeEach(function (): void {
     Mail::fake();
+    inventory()->defaultAvailable = 100;
 });
 
 it('notifies the customer once in the database and once by e-mail when an order is placed', function (): void {

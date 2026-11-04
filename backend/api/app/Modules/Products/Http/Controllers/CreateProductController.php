@@ -7,6 +7,7 @@ namespace App\Modules\Products\Http\Controllers;
 use App\Modules\Products\Actions\AddProduct;
 use App\Modules\Products\Http\Requests\CreateProductRequest;
 use App\Modules\Products\Http\Resources\ProductResource;
+use App\Modules\Products\Stock\InitialStock;
 use App\Modules\Products\Stock\StockLookup;
 use Illuminate\Http\JsonResponse;
 
@@ -19,6 +20,7 @@ final readonly class CreateProductController
     public function __construct(
         private AddProduct $add,
         private StockLookup $stock,
+        private InitialStock $initialStock,
         private ProductResource $resource,
     ) {}
 
@@ -32,7 +34,10 @@ final readonly class CreateProductController
             $request->imageFile(),
         );
 
-        $stock = $this->stock->forProducts([$product->id]);
+        $initial = $request->integer('initial_stock');
+        $stock = $initial > 0
+            ? $this->initialStock->register($product->id, $initial)
+            : $this->stock->forProducts([$product->id]);
 
         return new JsonResponse(
             ['data' => $this->resource->toArray($product, $stock->of($product->id))],

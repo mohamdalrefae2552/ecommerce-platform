@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Products\Http\Controllers\AdjustStockController;
 use App\Modules\Products\Http\Controllers\CreateProductController;
 use App\Modules\Products\Http\Controllers\ListCategoriesController;
 use App\Modules\Products\Http\Controllers\ListProductsController;
@@ -18,3 +19,4 @@ Route::get('/categories', ListCategoriesController::class);
 Route::get('/products', ListProductsController::class);
 Route::get('/products/{productId}', ShowProductController::class);
 Route::post('/products', CreateProductController::class)->middleware(['auth', 'can:create,'.Product::class]);
+Route::put('/products/{productId}/stock', AdjustStockController::class)->middleware(['auth', 'can:adjustStock,'.Product::class]);
