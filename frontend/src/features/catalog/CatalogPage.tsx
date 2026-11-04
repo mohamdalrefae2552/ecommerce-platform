@@ -1,0 +1,81 @@
+import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { useSession } from '../../auth/session';
+import { ErrorNotice } from '../../components/ErrorNotice';
+import { Pagination } from '../../components/Pagination';
+import { formatMoney, imagePath, stockText } from '../../lib/format';
+import { AddToCartButton } from './AddToCartButton';
+import { categoriesQuery, productsQuery } from './queries';
+
+interface CatalogPageProps {
+  readonly category: string | undefined;
+  readonly page: number;
+}
+
+export function CatalogPage({ category, page }: CatalogPageProps) {
+  const navigate = useNavigate({ from: '/products/' });
+  const session = useSession();
+  const categories = useQuery(categoriesQuery);
+  const products = useQuery(productsQuery(category, page));
+  const canBuy = session.status !== 'authenticated' || session.user.role === 'customer';
+
+  return (
+    <section>
+      <h1>المنتجات</h1>
+      <p>
+        <label>
+          التصنيف:{' '}
+          <select
+            value={category ?? ''}
+            onChange={(e) => {
+              const value = e.target.value;
+              void navigate({
+                search: { page: 1, ...(value === '' ? {} : { category: value }) },
+              });
+            }}
+          >
+            <option value="">كل التصنيفات</option>
+            {categories.data?.map((c) => (
+              <option key={c.id} value={c.slug}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </p>
+      {categories.error !== null && <ErrorNotice error={categories.error} />}
+
+      {products.isPending && <p role="status">جارٍ تحميل المنتجات…</p>}
+      {products.error !== null && <ErrorNotice error={products.error} />}
+      {products.data !== undefined && (
+        <>
+          {products.data.meta.degraded?.includes('inventory') === true && (
+            <p role="alert">
+              خدمة المخزون لا تستجيب حالياً؛ المنتجات معروضة دون معرفة الكميات المتوفرة.
+            </p>
+          )}
+          {products.data.data.length === 0 && <p>لا توجد منتجات في هذا التصنيف.</p>}
+          <ul>
+            {products.data.data.map((p) => (
+              <li key={p.id}>
+                <img src={imagePath(p.image_url)} alt={p.name} width={96} height={96} />{' '}
+                <Link to="/products/$productId" params={{ productId: p.id }}>
+                  {p.name}
+                </Link>{' '}
+                — {formatMoney(p.price)} — {p.category.name} — {stockText(p.stock)}{' '}
+                {canBuy && <AddToCartButton product={p} />}
+              </li>
+            ))}
+          </ul>
+          <Pagination
+            page={products.data.meta.page}
+            lastPage={products.data.meta.last_page}
+            onChange={(next) => {
+              void navigate({ search: (prev) => ({ ...prev, page: next }) });
+            }}
+          />
+        </>
+      )}
+    </section>
+  );
+}

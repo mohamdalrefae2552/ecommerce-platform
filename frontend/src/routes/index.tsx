@@ -1,15 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { HealthStatus } from '../features/health/HealthStatus';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/')({
-  component: HomePage,
+  beforeLoad: () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- TanStack Router's redirect contract
+    throw redirect({ to: '/products', search: { page: 1 } });
+  },
 });
-
-function HomePage() {
-  return (
-    <section>
-      <h1>المتجر</h1>
-      <HealthStatus />
-    </section>
-  );
-}
