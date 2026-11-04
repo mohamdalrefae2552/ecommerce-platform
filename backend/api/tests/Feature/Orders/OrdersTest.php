@@ -44,6 +44,24 @@ it('creates an order with a price snapshot, 201 and Location', function (): void
     getJson('/api/v1/orders/'.$order->id, bearer($customer))->assertJsonPath('data.items.0.unit_price.amount_minor', 450000);
 });
 
+it('accepts a line quantity of exactly 100 and rejects 101 on items.0.quantity', function (): void {
+    $customer = User::factory()->create();
+    $product = Product::factory()->create(['price_minor' => 1000]);
+
+    postJson('/api/v1/orders', ['items' => [['product_id' => $product->id, 'quantity' => 100]]], bearer($customer))
+        ->assertCreated()
+        ->assertJsonPath('data.items.0.quantity', 100)
+        ->assertMatchesContract();
+
+    postJson('/api/v1/orders', ['items' => [['product_id' => $product->id, 'quantity' => 101]]], bearer($customer))
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'VALIDATION_FAILED')
+        ->assertJsonStructure(['errors' => ['items.0.quantity']])
+        ->assertMatchesContract();
+
+    expect(Order::query()->count())->toBe(1);
+});
+
 it('rejects unknown and duplicated products with 422 on the line', function (Closure $items, string $field): void {
     $product = Product::factory()->create();
 
@@ -56,7 +74,7 @@ it('rejects unknown and duplicated products with 422 on the line', function (Clo
 })->with([
     'unknown product' => [fn (Product $p): array => [['product_id' => '01JC40A1B2C3D4E5F6G7H8J9KM', 'quantity' => 1]], 'items.0.product_id'],
     'duplicated product' => [fn (Product $p): array => [['product_id' => $p->id, 'quantity' => 1], ['product_id' => $p->id, 'quantity' => 2]], 'items.1.product_id'],
-    'quantity above 10' => [fn (Product $p): array => [['product_id' => $p->id, 'quantity' => 11]], 'items.0.quantity'],
+    'quantity above 100' => [fn (Product $p): array => [['product_id' => $p->id, 'quantity' => 101]], 'items.0.quantity'],
     'no lines' => [fn (Product $p): array => [], 'items'],
     'unknown line field' => [fn (Product $p): array => [['product_id' => $p->id, 'quantity' => 1, 'price_minor' => 1]], 'items.0'],
 ]);

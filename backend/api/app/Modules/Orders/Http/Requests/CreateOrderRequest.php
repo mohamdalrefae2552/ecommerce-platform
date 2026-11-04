@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 /**
  * Schema CreateOrderRequest: 1..20 lines, each product at most once,
- * quantity 1..10. The Idempotency-Key header, when present, must be a UUID
+ * quantity 1..100. The Idempotency-Key header, when present, must be a UUID
  * (400 MALFORMED_REQUEST otherwise).
  */
 final class CreateOrderRequest extends StrictFormRequest
@@ -22,7 +22,7 @@ final class CreateOrderRequest extends StrictFormRequest
             'items' => ['bail', 'required', 'array', 'list', 'min:1', 'max:20'],
             'items.*' => ['bail', 'required', 'array:product_id,quantity'],
             'items.*.product_id' => ['bail', 'required', 'string', 'ulid', 'distinct:ignore_case'],
-            'items.*.quantity' => ['bail', 'required', 'integer', 'min:1', 'max:10'],
+            'items.*.quantity' => ['bail', 'required', 'integer', 'min:1', 'max:100'],
         ];
     }
 
