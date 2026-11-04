@@ -9,14 +9,17 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Exceptions\DecoderException;
 use Intervention\Image\ImageManager;
 
 /**
  * Product images (docs/02 Products): every upload is decoded and re-encoded
  * to WebP, which strips EXIF and neutralises polyglot files, then stored
  * under a random ULID name on the public disk (the product-images volume)
- * that edge serves at /storage/products/{ulid}.webp.
+ * that edge serves at /storage/products/{ulid}.webp. Bytes that pass the
+ * header checks but cannot be decoded are rejected as a validation error.
  */
 final readonly class ProductImageStore
 {
@@ -24,7 +27,12 @@ final readonly class ProductImageStore
 
     public function store(UploadedFile $upload): string
     {
-        $webp = (new ImageManager(new Driver))->read($upload->getRealPath())->toWebp(quality: 82);
+        try {
+            $webp = (new ImageManager(new Driver))->read($upload->getRealPath())->toWebp(quality: 82);
+        } catch (DecoderException) {
+            throw ValidationException::withMessages(['image' => 'تعذّر قراءة الصورة؛ الملف تالف أو غير صالح.']);
+        }
+
         $name = Str::ulid().'.webp';
 
         $this->disk()->put(self::DIRECTORY.'/'.$name, (string) $webp);

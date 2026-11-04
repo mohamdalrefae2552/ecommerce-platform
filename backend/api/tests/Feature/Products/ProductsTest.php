@@ -122,6 +122,28 @@ it('validates the product and its image', function (Closure $overrides, string $
     'unknown field' => [fn (): array => ['stock' => '5'], 'stock'],
 ]);
 
+it('rejects an image with a valid header but undecodable bytes without storing anything', function (): void {
+    $category = Category::factory()->create();
+    $canvas = imagecreatetruecolor(10, 10);
+    ob_start();
+    imagepng($canvas);
+    $png = (string) ob_get_clean();
+    // Keep the signature, IHDR and the IDAT chunk header, then replace the pixel data with garbage.
+    $corrupt = substr($png, 0, (int) strpos($png, 'IDAT') + 4).str_repeat("\x00garbage", 40);
+
+    createProduct(
+        productFields($category, ['image' => UploadedFile::fake()->createWithContent('corrupt.png', $corrupt)]),
+        bearer(User::factory()->admin()->create()),
+    )
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'VALIDATION_FAILED')
+        ->assertJsonStructure(['errors' => ['image']])
+        ->assertMatchesContract();
+
+    expect(Product::query()->count())->toBe(0)
+        ->and(Storage::disk('public')->allFiles())->toBe([]);
+});
+
 it('lists products newest first with the contract pagination envelope', function (): void {
     $category = Category::factory()->create();
     $products = [];
