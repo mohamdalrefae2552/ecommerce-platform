@@ -8,9 +8,11 @@ use App\Shared\Auth\JwtConfig;
 use App\Shared\Auth\JwtKeyStore;
 use App\Shared\Auth\TokenIssuer;
 use App\Shared\Auth\TokenVerifier;
+use App\Shared\Inventory\InventoryGateway;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Testing\TestResponse;
 use Studio\Gesso\Laravel\ValidatesOpenApiSchema;
+use Tests\Support\FakeInventoryGateway;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -37,6 +39,9 @@ abstract class TestCase extends BaseTestCase
         foreach ([JwtConfig::class, JwtKeyStore::class, TokenIssuer::class, TokenVerifier::class] as $service) {
             $this->app->forgetInstance($service);
         }
+
+        // Feature tests never reach the network: an in-memory inventory.
+        $this->app->instance(InventoryGateway::class, new FakeInventoryGateway);
     }
 
     /**
