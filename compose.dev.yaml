@@ -5,6 +5,13 @@ services:
     ports:
       - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
+  # gRPC access to the inventory for manual testing (Postman, grpcurl) on
+  # localhost only. It goes through toxiproxy, so chaos-down / chaos-latency
+  # apply to it too; db-inventory itself stays unreachable.
+  toxiproxy:
+    ports:
+      - "127.0.0.1:${INVENTORY_GRPC_DEV_PORT:-50051}:50051"
+
   # Vite dev server with hot reload; /api is proxied to edge so the browser
   # stays on one origin. Start with: docker compose --profile dev up web-dev
   web-dev:
