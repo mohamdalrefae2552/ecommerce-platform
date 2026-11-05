@@ -139,12 +139,18 @@ verify-e2e: ## Playwright E2E against the running stack (run `make up` first)
 	$(TESTS) run --rm e2e
 
 # ---------------------------------------------------------------- proofs --
-.PHONY: race-test demo-r1 demo-r2
+.PHONY: race-test postman demo-r1 demo-r2
 race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [N=50]
 	$(need_docker)
 	$(call need,tests/load/race.js,P2-QA-01)
 	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run --quiet /work/tests/load/race.js
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/race-verify.sh
+
+postman: ## Run every REST request of tests/postman with newman against the running stack
+	$(need_docker)
+	docker run --rm --network container:$(PROJECT)-edge-1 -v "$(CURDIR):/work" -w /work \
+	  node:24.22.2-alpine3.24 npx -y newman@6.2.1 run tests/postman/ecommerce-api.postman_collection.json \
+	  --env-var baseUrl=http://localhost/api/v1
 
 demo-r1: ## Interview demo, requirement 1 (IDOR, 403, rate limit, JWT, headers)
 	$(call need,tests/security/scripts/demo-r1.sh,P1-QA-01)
