@@ -60,9 +60,6 @@ function Navigation() {
             <Link to="/admin">لوحة المسؤول</Link>
           </li>
         )}
-        <li>
-          <Link to="/guide">دليل العرض</Link>
-        </li>
         <li className="spacer" />
         {session.status === 'restoring' && <li className="muted">جارٍ التحقق من الجلسة…</li>}
         {session.status === 'anonymous' && (
