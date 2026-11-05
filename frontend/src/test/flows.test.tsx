@@ -162,18 +162,12 @@ describe('order security', () => {
     expect(await screen.findByRole('heading', { name: 'الطلب غير موجود' })).toBeDefined();
   });
 
-  it('shows the 403 message when a customer tries to change the status', async () => {
-    server.use(
-      http.get(apiUrl(`/orders/${ORDER_ID}`), () => json({ data: order() })),
-      http.patch(apiUrl(`/orders/${ORDER_ID}/status`), () =>
-        problemResponse(problem('FORBIDDEN', 403, `/api/v1/orders/${ORDER_ID}/status`)),
-      ),
-    );
+  it('offers a customer no way to change the status of their own order', async () => {
+    server.use(http.get(apiUrl(`/orders/${ORDER_ID}`), () => json({ data: order() })));
     renderApp(`/orders/${ORDER_ID}`, { as: customer });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'حاول تغيير الحالة إلى مؤكد' }));
-
-    expect(await screen.findByText('ليست لديك صلاحية لتنفيذ هذه العملية.')).toBeDefined();
+    expect(await screen.findByText('نسخ رقم الطلب')).toBeDefined();
+    expect(screen.queryByRole('button', { name: /الحالة إلى/ })).toBeNull();
   });
 });
 
