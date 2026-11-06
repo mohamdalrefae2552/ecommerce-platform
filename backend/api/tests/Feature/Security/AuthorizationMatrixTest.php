@@ -41,6 +41,7 @@ function authorizationMatrix(): array
         'products' => ['GET', '/api/v1/products', [], ['guest' => 200, 'owner' => 200, 'other' => 200, 'admin' => 200]],
         'product' => ['GET', '/api/v1/products/{product}', [], ['guest' => 200, 'owner' => 200, 'other' => 200, 'admin' => 200]],
         'adjust stock (role checked before the body)' => ['PUT', '/api/v1/products/{product}/stock', [], ['guest' => 401, 'owner' => 403, 'other' => 403, 'admin' => 400]],
+        'update product (role checked before the body)' => ['PATCH', '/api/v1/products/{product}', [], ['guest' => 401, 'owner' => 403, 'other' => 403, 'admin' => 422]],
         'create product (role checked before the body)' => ['POST', '/api/v1/products', [], ['guest' => 401, 'owner' => 403, 'other' => 403, 'admin' => 422]],
         'create order' => ['POST', '/api/v1/orders', $line, ['guest' => 401, 'owner' => 201, 'other' => 201, 'admin' => 403]],
         'list orders' => ['GET', '/api/v1/orders', [], ['guest' => 401, 'owner' => 200, 'other' => 200, 'admin' => 200]],

@@ -33,6 +33,10 @@ RUN MAKEFLAGS="-j$(nproc)" install-php-extensions grpc-1.85.0
 # sodium (lcobucci/jwt EdDSA) is already compiled into the official image.
 RUN install-php-extensions pdo_pgsql intl gd opcache
 
+# phpredis for the Redis cache store (requirement 3); its own layer so the
+# layers above stay cached.
+RUN install-php-extensions redis-6.2.0
+
 # fcgi provides cgi-fcgi for the php-fpm-healthcheck script.
 RUN apk add --no-cache fcgi
 

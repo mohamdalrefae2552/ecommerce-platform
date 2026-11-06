@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Products\Models;
 
+use App\Modules\Products\Cache\InvalidateCatalog;
 use App\Modules\Products\Database\Factories\ProductFactory;
 use App\Shared\Database\HasUppercaseUlids;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\UseFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +29,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
+#[ObservedBy(InvalidateCatalog::class)]
 #[UseFactory(ProductFactory::class)]
 final class Product extends Model
 {

@@ -71,7 +71,7 @@
 | `POST /auth/register` · `POST /auth/login` · `POST /auth/refresh` | ✅ | ✅ | ✅ |
 | `POST /auth/logout` · `GET /auth/me` | 401 | ✅ | ✅ |
 | `GET /categories` · `GET /products` · `GET /products/{id}` | ✅ | ✅ | ✅ |
-| `POST /products` · `PUT /products/{id}/stock` | 401 | 403 | ✅ |
+| `POST /products` · `PATCH /products/{id}` · `PUT /products/{id}/stock` | 401 | 403 | ✅ |
 | `POST /orders` | 401 | ✅ | 403 (المسؤول لا يشتري — قرار تبسيط) |
 | `GET /orders` | 401 | طلباته فقط | كل الطلبات (+ فلتر `status`, `user_id`) |
 | `GET /orders/{id}` | 401 | طلبه ✅ · طلب غيره **404** | ✅ |
@@ -99,6 +99,7 @@
 | GET | `/products?category={slug}&page&per_page&q` | `q` بحث بالاسم (اختياري، 1..100 حرف)؛ `page` 1..100000 | 200 قائمة؛ كل عنصر فيه `stock` (انظر أدناه) |
 | GET | `/products/{id}` | يسأل المستودع (R2-F2) | 200 |
 | POST | `/products` | multipart: `name` (2..120)، `description` (اختياري ≤ 2000)، `price_minor` (1..100,000,000,000)، `category_id`، `image` (+ `initial_stock` ابتداءً من المتطلب 2) | 201 |
+| PATCH | `/products/{id}` | **(المتطلب 3)** JSON جزئي: `name`، `description`، `price_minor`، `category_id` (حقل واحد على الأقل؛ الصورة والمخزون لا يُعدّلان هنا). يُبطل كاش الكتالوج بعد الـ commit فيظهر التعديل في القراءة التالية (ADR-0013) | 200 المنتج |
 | PUT | `/products/{id}/stock` | **(المتطلب 2)** `{delta, note?}` (`delta` ≠ 0، \|delta\| ≤ 1,000,000، `note` ≤ 200) + `Idempotency-Key` **إلزامي** ⇒ `AdjustStock`. خصم أكبر من المتاح ⇒ 409 `INSUFFICIENT_STOCK` (+ `shortages`)؛ المستودع متوقف ⇒ 503 | 200 `{data:{product_id, available}}` |
 
 **تمثيل المخزون في المنتج (graceful degradation — PROOF-R2-2):**

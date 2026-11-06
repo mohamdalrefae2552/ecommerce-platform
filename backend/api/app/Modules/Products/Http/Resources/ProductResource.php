@@ -9,7 +9,9 @@ use App\Modules\Products\Models\Product;
 
 /**
  * Schema Product. The stock block is the inventory service's answer
- * (`unknown` / null when it is not available).
+ * (`unknown` / null when it is not available). The catalogue cache keeps
+ * the stock-free part (withoutStock) and the stock is added on every read
+ * (withStock), so a cached product never shows an old quantity.
  */
 final readonly class ProductResource
 {
@@ -20,6 +22,14 @@ final readonly class ProductResource
      * @return array<string, mixed>
      */
     public function toArray(Product $product, array $stock): array
+    {
+        return self::withStock($this->withoutStock($product), $stock);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function withoutStock(Product $product): array
     {
         return [
             'id' => $product->id,
@@ -32,8 +42,17 @@ final readonly class ProductResource
                 'name' => $product->category->name,
             ],
             'image_url' => $this->images->url($product->image),
-            'stock' => $stock,
             'created_at' => $product->created_at->utc()->format('Y-m-d\TH:i:s\Z'),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $product  output of withoutStock()
+     * @param  array{status: string, available: int|null}  $stock
+     * @return array<string, mixed>
+     */
+    public static function withStock(array $product, array $stock): array
+    {
+        return [...$product, 'stock' => $stock];
     }
 }

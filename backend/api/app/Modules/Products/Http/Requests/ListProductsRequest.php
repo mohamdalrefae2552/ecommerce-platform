@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace App\Modules\Products\Http\Requests;
 
+use App\Modules\Products\Cache\CatalogReads;
 use App\Shared\Http\Pagination\PageRequest;
 use App\Shared\Http\Requests\StrictFormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Query of GET /products: an unknown category slug is a 422 on `category`.
+ * Query of GET /products: an unknown category slug is a 422 on `category`
+ * (checked against the cached category list, without a query).
  */
 final class ListProductsRequest extends StrictFormRequest
 {
     public function rules(): array
     {
         return [
-            'category' => ['bail', 'sometimes', 'string', 'max:64', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::exists('categories', 'slug')],
+            'category' => ['bail', 'sometimes', 'string', 'max:64', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::in(array_column(app(CatalogReads::class)->categories(), 'slug'))],
             'q' => ['bail', 'sometimes', 'string', 'min:1', 'max:100'],
             ...PageRequest::rules(),
         ];

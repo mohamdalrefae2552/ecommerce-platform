@@ -14,6 +14,17 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
 fi
 
+# Variables added to .env.example after .env was created (new services such
+# as Redis): append the missing ones with their development default.
+[[ -z "$(tail -c1 .env)" ]] || echo >>.env
+while IFS= read -r line; do
+  key="${line%%=*}"
+  if ! grep -qE "^${key}=" .env; then
+    step "adding $key to .env (new in .env.example)"
+    printf '%s\n' "$line" >>.env
+  fi
+done < <(grep -E '^[A-Z][A-Z0-9_]*=' .env.example)
+
 # fill_secret <VAR>: generate a random value for an empty VAR in .env.
 fill_secret() {
   if grep -qE "^$1=$" .env; then

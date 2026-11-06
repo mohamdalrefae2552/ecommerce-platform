@@ -443,6 +443,68 @@ paths:
           $ref: '#/components/responses/RateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
+    patch:
+      tags: [Products]
+      operationId: updateProduct
+      summary: Edit a product (admin only)
+      description: |
+        Partial update: only the fields sent change; at least one is
+        required. The image and the stock are not edited here (stock:
+        `PUT /products/{productId}/stock`). The change is visible on the very
+        next read of the product and of every list that contains it: the
+        catalogue cache is invalidated when the change is committed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProductRequest'
+            example:
+              name: هاتف ذكي X200 برو
+              price_minor: 425000000
+      responses:
+        '200':
+          description: The product after the change, with its current stock.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductEnvelope'
+              example:
+                data:
+                  id: 01JC40A1B2C3D4E5F6G7H8J9KM
+                  name: هاتف ذكي X200 برو
+                  description: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+                  price:
+                    amount_minor: 425000000
+                    currency: SYP
+                  category:
+                    id: 01JC3Z0Y1E2C3T4R5N6C7S8A9B
+                    slug: electronics
+                    name: إلكترونيات
+                  image_url: http://localhost:8080/storage/products/01JC40B9C8D7E6F5G4H3J2K1MN.webp
+                  stock:
+                    status: in_stock
+                    available: 3
+                  created_at: '2026-11-01T17:41:00Z'
+        '400':
+          $ref: '#/components/responses/MalformedRequest'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /products/{productId}/stock:
     parameters:
@@ -1699,6 +1761,30 @@ components:
           type: string
           contentMediaType: application/octet-stream
           description: JPEG, PNG or WebP; at most 2 MB and 4000x4000 px.
+    UpdateProductRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: At least one field. Unknown fields are a 422.
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 120
+          example: هاتف ذكي X200 برو
+        description:
+          type: string
+          maxLength: 2000
+          example: شاشة 6.5 إنش وذاكرة 128 غيغابايت.
+        price_minor:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 100000000000
+          description: Price in SYP minor units. Existing orders keep their snapshot.
+          example: 425000000
+        category_id:
+          $ref: '#/components/schemas/Ulid'
     AdjustStockRequest:
       type: object
       additionalProperties: false

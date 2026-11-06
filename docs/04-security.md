@@ -43,7 +43,7 @@
 | `api` (عام) | `user_id` أو `ip` | 120 / دقيقة |
 | `orders-create` | `user_id` | 10 / دقيقة |
 - الرد: 429 problem+json `RATE_LIMITED` + `Retry-After` + `X-RateLimit-Limit/Remaining`.
-- المخزن: cache store `database` (Postgres) الآن؛ Redis في المتطلب 3. **IP الحقيقي:** `TrustProxies` يثق بـ `edge` فقط (عنوان شبكة Docker)، لا بـ `*`.
+- المخزن: cache store `redis` منذ المتطلب 3 (ADR-0013)؛ الاختبارات `array`. **IP الحقيقي:** `TrustProxies` يثق بـ `edge` فقط (عنوان شبكة Docker)، لا بـ `*`.
 - الدخول الناجح يصفّر عداد `login` لذلك البريد.
 
 ## 4. ترويسات الأمان (R1-SEC3)

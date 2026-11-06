@@ -28,7 +28,12 @@ x-api-env: &api-env
   DB_DATABASE: ${DB_DATABASE:-app}
   DB_USERNAME: ${DB_USERNAME:-app}
   DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
-  CACHE_STORE: ${CACHE_STORE:-database}
+  # Requirement 3: cache store (catalogue cache, rate limiters) in Redis.
+  # Not taken from .env on purpose: older .env files still say "database".
+  CACHE_STORE: redis
+  REDIS_HOST: redis
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (make bootstrap adds it)}
+  CATALOG_CACHE_TTL: ${CATALOG_CACHE_TTL:-600}
   SESSION_DRIVER: ${SESSION_DRIVER:-array}
   QUEUE_CONNECTION: ${QUEUE_CONNECTION:-sync}
   MAIL_MAILER: ${MAIL_MAILER:-smtp}
@@ -103,6 +108,8 @@ services:
     depends_on:
       db-app:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       toxiproxy:
         condition: service_healthy
       mailpit:
@@ -127,6 +134,8 @@ services:
     depends_on:
       db-app:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       toxiproxy:
         condition: service_healthy
     healthcheck:
@@ -147,6 +156,29 @@ services:
     volumes:
       - db-app-data:/var/lib/postgresql
     healthcheck: *pg-health
+    networks: [app-net]
+
+  # Requirement 3: cache only. No persistence (a restart empties it, which is
+  # always safe for a cache); 128 MB with volatile-lru, so only keys that
+  # have a TTL are evicted and the catalogue version key never is. No
+  # published port; password from .env.
+  redis:
+    image: redis:8.6.8-alpine3.23
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --save "" --appendonly no --maxmemory 128mb --maxmemory-policy volatile-lru
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (make bootstrap adds it)}
+    read_only: true
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks: [app-net]
 
   inventory:
@@ -251,6 +283,7 @@ services:
     environment:
       <<: *api-env
       APP_ENV: testing
+      CACHE_STORE: array
       DB_HOST: db-app-test
       DB_DATABASE: ${DB_TEST_DATABASE:-app_test}
       DB_USERNAME: ${DB_TEST_USERNAME:-app}
