@@ -4,7 +4,6 @@ import { useSession } from '../../auth/session';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { StockBadge } from '../../components/StockBadge';
 import { formatMoney, imagePath } from '../../lib/format';
-import { ConcurrencyTest } from '../orders/ConcurrencyTest';
 import { StockForm } from '../admin/StockForm';
 import { AddToCartButton } from './AddToCartButton';
 import { productQuery } from './queries';
@@ -49,7 +48,6 @@ export function ProductPage({ productId }: { readonly productId: string }) {
           {isAdmin && <StockForm productId={product.id} />}
         </div>
       </div>
-      {session.status === 'authenticated' && !isAdmin && <ConcurrencyTest product={product} />}
     </section>
   );
 }

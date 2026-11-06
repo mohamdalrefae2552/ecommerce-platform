@@ -7,7 +7,6 @@ import { showToast } from '../../components/toast';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { StatusPill } from '../../components/StatusPill';
 import { formatDate, formatMoney } from '../../lib/format';
-import { DemoStatusAttempt } from './DemoStatusAttempt';
 import { StatusChanger } from './StatusChanger';
 import { orderQuery } from './queries';
 import { statusLabels } from './status';
@@ -64,7 +63,6 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
         الحالة: <StatusPill status={order.status} />{' '}
         {isAdmin && <StatusChanger orderId={order.id} status={order.status} />}
       </div>
-      {!isAdmin && <DemoStatusAttempt orderId={order.id} />}
       <p>المجموع: {formatMoney(order.total)}</p>
       <h2>المنتجات</h2>
       <table>
