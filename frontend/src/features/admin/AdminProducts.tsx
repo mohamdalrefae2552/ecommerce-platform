@@ -97,15 +97,6 @@ function StockRow({ product }: { readonly product: Product }) {
           >
             تعيين
           </button>
-          <button
-            type="button"
-            disabled={adjust.isPending || available === null}
-            onClick={() => {
-              if (available !== null) apply(1 - available);
-            }}
-          >
-            اجعل المخزون 1
-          </button>
         </div>
         {available === null && <p className="muted">الكمية غير معروفة الآن؛ «تعيين» غير متاح.</p>}
         {info !== null && <p className="muted">{info}</p>}

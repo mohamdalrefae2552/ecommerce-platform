@@ -229,7 +229,7 @@ describe('admin order management', () => {
 });
 
 describe('admin dashboard', () => {
-  it('makes the stock 1 with a delta computed from the current quantity', async () => {
+  it('sets the stock with a delta computed from the current quantity', async () => {
     let sent: unknown = null;
     let key: string | null = null;
     const product = {
@@ -266,7 +266,7 @@ describe('admin dashboard', () => {
     );
     renderApp('/admin', { as: admin });
 
-    fireEvent.click(await screen.findByRole('button', { name: 'اجعل المخزون 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'تعيين' }));
 
     await waitFor(() => {
       expect(sent).toEqual({ delta: -4 });

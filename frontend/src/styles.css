@@ -613,22 +613,6 @@ tbody tr:hover td {
 
 /* ---------- misc blocks ---------- */
 
-fieldset {
-  border: 2px dashed var(--primary-2);
-  border-radius: var(--radius);
-  background: #faf8ff;
-  margin: 24px 0;
-  padding: 12px 20px 16px;
-}
-
-legend {
-  padding: 2px 14px;
-  border-radius: 999px;
-  background: var(--primary-2);
-  color: #fff;
-  font-weight: 700;
-}
-
 dl {
   display: grid;
   grid-template-columns: max-content 1fr;
