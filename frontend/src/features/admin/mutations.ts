@@ -52,3 +52,15 @@ export function useCreateProduct() {
       ),
   });
 }
+
+type UpdateProductRequest = components['schemas']['UpdateProductRequest'];
+
+/** PATCH /products/{id}: partial edit (admin). The next read shows it (no stale cache). */
+export function useUpdateProduct(productId: string) {
+  return useMutation({
+    mutationFn: async (body: UpdateProductRequest) =>
+      requireData(
+        await api.PATCH('/products/{productId}', { params: { path: { productId } }, body }),
+      ),
+  });
+}

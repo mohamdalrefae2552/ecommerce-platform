@@ -8,9 +8,91 @@ import { StockBadge } from '../../components/StockBadge';
 import { showToast } from '../../components/toast';
 import { formatMoney } from '../../lib/format';
 import { productsQuery } from '../catalog/queries';
-import { useAdjustStock } from './mutations';
+import { useAdjustStock, useUpdateProduct } from './mutations';
 
 type Product = components['schemas']['Product'];
+
+/**
+ * Inline edit of the name and the price (PATCH /products/{id}). The list is
+ * refetched after saving, so the edit shows at once (the API invalidates its
+ * catalogue cache when the change is committed).
+ */
+function EditProduct({ product }: { readonly product: Product }) {
+  const queryClient = useQueryClient();
+  const update = useUpdateProduct(product.id);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(product.name);
+  const [price, setPrice] = useState(String(product.price.amount_minor / 100));
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setName(product.name);
+          setPrice(String(product.price.amount_minor / 100));
+          setOpen(true);
+        }}
+      >
+        تعديل
+      </button>
+    );
+  }
+
+  const priceMajor = Number(price);
+  const trimmed = name.trim();
+  const valid = trimmed.length >= 2 && trimmed.length <= 120 && priceMajor > 0;
+
+  return (
+    <form
+      className="stock-control"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!valid) return;
+        update.mutate(
+          { name: trimmed, price_minor: Math.round(priceMajor * 100) },
+          {
+            onSuccess: ({ data }) => {
+              setOpen(false);
+              showToast(`تم حفظ تعديل «${data.name}»`);
+              void queryClient.invalidateQueries({ queryKey: ['products'] });
+            },
+          },
+        );
+      }}
+    >
+      <input
+        aria-label={`الاسم الجديد: ${product.name}`}
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value);
+        }}
+      />
+      <input
+        type="number"
+        min={0.01}
+        step={0.01}
+        aria-label={`السعر الجديد (ل.س): ${product.name}`}
+        value={price}
+        onChange={(e) => {
+          setPrice(e.target.value);
+        }}
+      />
+      <button type="submit" disabled={!valid || update.isPending}>
+        حفظ
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setOpen(false);
+        }}
+      >
+        إلغاء
+      </button>
+      {update.error !== null && <ErrorNotice error={update.error} />}
+    </form>
+  );
+}
 
 /**
  * Inline stock control. Every adjustment is a delta (the API has no "set"),
@@ -102,6 +184,9 @@ function StockRow({ product }: { readonly product: Product }) {
         {info !== null && <p className="muted">{info}</p>}
         {adjust.error !== null && <ErrorNotice error={adjust.error} />}
       </td>
+      <td>
+        <EditProduct product={product} />
+      </td>
     </tr>
   );
 }
@@ -129,6 +214,7 @@ export function AdminProducts() {
                 <th>السعر</th>
                 <th>المخزون الحالي</th>
                 <th>تعديل المخزون</th>
+                <th>تعديل المنتج</th>
               </tr>
             </thead>
             <tbody>

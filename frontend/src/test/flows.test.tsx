@@ -6,7 +6,7 @@ import { addToCart, clearCart } from '../features/cart/cart';
 import { PASSWORD, admin, customer, problem } from '../mocks/db';
 import { apiUrl, healthOk, json, problemResponse } from '../mocks/handlers';
 import { server } from '../mocks/server';
-import { stockIs } from './helpers';
+import { product as productFixture, stockIs } from './helpers';
 import { renderApp } from './renderApp';
 
 type Order = components['schemas']['Order'];
@@ -273,5 +273,52 @@ describe('admin dashboard', () => {
     });
     expect(key).toMatch(/^[0-9a-f-]{36}$/);
     expect(await screen.findByText('تم تحديث المخزون إلى 1')).toBeDefined();
+  });
+
+  it('edits the name and the price inline and shows the edit right away', async () => {
+    let sent: unknown = null;
+    let current = productFixture(5);
+    const page = () =>
+      json({
+        data: [current],
+        meta: { page: 1, per_page: 12, total: 1, last_page: 1 },
+        links: { first: '', prev: null, next: null, last: '' },
+      });
+    server.use(
+      http.get(apiUrl('/categories'), () => json({ data: [] })),
+      http.get(apiUrl('/products'), page),
+      http.get(apiUrl('/orders'), () =>
+        json({
+          data: [],
+          meta: { page: 1, per_page: 20, total: 0, last_page: 1 },
+          links: { first: '', prev: null, next: null, last: '' },
+        }),
+      ),
+      http.patch(apiUrl(`/products/${PRODUCT_ID}`), async ({ request }) => {
+        sent = await request.json();
+        current = {
+          ...current,
+          name: 'هاتف معدّل',
+          price: { amount_minor: 399900, currency: 'SYP' },
+        };
+        return json({ data: current });
+      }),
+    );
+    renderApp('/admin', { as: admin });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'تعديل' }));
+    fireEvent.change(screen.getByLabelText('الاسم الجديد: هاتف ذكي X200'), {
+      target: { value: '  هاتف معدّل ' },
+    });
+    fireEvent.change(screen.getByLabelText('السعر الجديد (ل.س): هاتف ذكي X200'), {
+      target: { value: '3999' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'حفظ' }));
+
+    await waitFor(() => {
+      expect(sent).toEqual({ name: 'هاتف معدّل', price_minor: 399900 });
+    });
+    expect(await screen.findByText('تم حفظ تعديل «هاتف معدّل»')).toBeDefined();
+    expect(await screen.findByRole('link', { name: 'هاتف معدّل' })).toBeDefined();
   });
 });
