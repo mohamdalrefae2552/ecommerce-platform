@@ -462,6 +462,72 @@
           }
         },
         {
+          "name": "Admin: Edit product -> 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 with the new name and price', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data.name).to.eql('Postman Test Watch (edited)');",
+                  "  pm.expect(j.data.price.amount_minor).to.eql(45000000);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Postman Test Watch (edited)\", \"price_minor\": 45000000 }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/products/{{new_product_id}}"
+          }
+        },
+        {
+          "name": "Product details after edit -> 200 (no stale cache)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the next read shows the edit immediately', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data.name).to.eql('Postman Test Watch (edited)');",
+                  "  pm.expect(j.data.price.amount_minor).to.eql(45000000);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/products/{{new_product_id}}"
+          }
+        },
+        {
           "name": "Customer: Create product -> 403",
           "request": {
             "method": "POST",
@@ -482,6 +548,43 @@
               ]
             },
             "url": "{{baseUrl}}/products"
+          }
+        },
+        {
+          "name": "Customer: Edit product -> 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"name\": \"Hacked\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/products/{{new_product_id}}"
           }
         },
         {
