@@ -24,6 +24,10 @@ x-api-env: &api-env
   LOG_LEVEL: ${LOG_LEVEL:-info}
   DB_CONNECTION: pgsql
   DB_HOST: ${DB_HOST:-db-app}
+  # Requirement 3 (ADR-0014): reads from the streaming replica, writes to
+  # db-app; sticky + ReadYourWrites keep "the user sees what they created".
+  DB_READ_HOST: ${DB_READ_HOST:-db-app-replica}
+  DB_READ_YOUR_WRITES_SECONDS: ${DB_READ_YOUR_WRITES_SECONDS:-5}
   DB_PORT: ${DB_PORT:-5432}
   DB_DATABASE: ${DB_DATABASE:-app}
   DB_USERNAME: ${DB_USERNAME:-app}
@@ -110,6 +114,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-app-replica:
+        condition: service_healthy
       toxiproxy:
         condition: service_healthy
       mailpit:
@@ -128,7 +134,10 @@ services:
       target: runtime
     restart: unless-stopped
     command: ["php", "artisan", "schedule:work"]
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # The saga reconciler decides on fresh state: it reads the primary.
+      DB_READ_HOST: db-app
     volumes:
       - jwt-keys:/app/storage/keys
     depends_on:
@@ -149,13 +158,68 @@ services:
   db-app:
     image: postgres:18.6-alpine3.24
     restart: unless-stopped
+    # Primary of the streaming replication (requirement 3, ADR-0014): its
+    # pg_hba also admits replication connections from app-net.
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf", "-c", "wal_keep_size=256MB"]
     environment:
       POSTGRES_DB: ${DB_DATABASE:-app}
       POSTGRES_USER: ${DB_USERNAME:-app}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     volumes:
       - db-app-data:/var/lib/postgresql
+      - ./infra/postgres/primary-hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck: *pg-health
+    networks: [app-net]
+
+  # One-shot: creates/updates the replication role on db-app on every `up`
+  # (works for volumes created before the replica existed).
+  db-app-roles:
+    image: postgres:18.6-alpine3.24
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - psql -h db-app -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -v ON_ERROR_STOP=1 -v user="$$REPLICATION_USER" -v password="$$REPLICATION_PASSWORD" -f /replication-role.sql
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-app}
+      POSTGRES_USER: ${DB_USERNAME:-app}
+      PGPASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      REPLICATION_USER: ${REPLICATION_USER:-replicator}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?set REPLICATION_PASSWORD in .env (make bootstrap adds it)}
+    volumes:
+      - ./infra/postgres/replication-role.sql:/replication-role.sql:ro
+    depends_on:
+      db-app:
+        condition: service_healthy
+    networks: [app-net]
+
+  # Hot-standby read replica of db-app (requirement 3, R3-4): cloned with
+  # pg_basebackup on first start, then kept current by streaming replication.
+  # Read-only: the api sends only reads here.
+  db-app-replica:
+    image: postgres:18.6-alpine3.24
+    restart: unless-stopped
+    entrypoint: ["sh", "/replica-entrypoint.sh"]
+    environment:
+      PRIMARY_HOST: db-app
+      REPLICATION_USER: ${REPLICATION_USER:-replicator}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD:?set REPLICATION_PASSWORD in .env (make bootstrap adds it)}
+      # Only used by the healthcheck (the data comes from the primary).
+      POSTGRES_DB: ${DB_DATABASE:-app}
+      POSTGRES_USER: ${DB_USERNAME:-app}
+    volumes:
+      - db-app-replica-data:/var/lib/postgresql
+      - ./infra/postgres/replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    healthcheck:
+      # Healthy = accepting connections AND in recovery (a standby).
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1 && [ \"$$(psql -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1 -Atc 'select pg_is_in_recovery()')\" = t ]"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      db-app-roles:
+        condition: service_completed_successfully
     networks: [app-net]
 
   # Requirement 3: cache only. No persistence (a restart empties it, which is
@@ -285,6 +349,7 @@ services:
       APP_ENV: testing
       CACHE_STORE: array
       DB_HOST: db-app-test
+      DB_READ_HOST: db-app-test
       DB_DATABASE: ${DB_TEST_DATABASE:-app_test}
       DB_USERNAME: ${DB_TEST_USERNAME:-app}
       DB_PASSWORD: ${DB_TEST_PASSWORD:-app-test-password}
@@ -406,6 +471,7 @@ networks:
 
 volumes:
   db-app-data: {}
+  db-app-replica-data: {}
   db-inventory-data: {}
   product-images: {}
   jwt-keys: {}

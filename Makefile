@@ -139,7 +139,7 @@ verify-e2e: ## Playwright E2E against the running stack (run `make up` first)
 	$(TESTS) run --rm e2e
 
 # ---------------------------------------------------------------- proofs --
-.PHONY: race-test perf-seed perf-test postman demo-r1 demo-r2
+.PHONY: race-test perf-seed perf-test replica-check postman demo-r1 demo-r2
 race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [N=50]
 	$(need_docker)
 	$(call need,tests/load/race.js,P2-QA-01)
@@ -155,6 +155,10 @@ perf-test: ## R3-7: p50/p95/p99 per endpoint + CPU: make perf-test OUT=baseline|
 	$(call need,tests/load/perf.js,R3)
 	@PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" OUT="$(or $(OUT),perf)" DURATION="$(DURATION)" SCALE="$(SCALE)" CUSTOMERS="$(CUSTOMERS)" \
 	  bash $(SCRIPTS)/perf-test.sh
+
+replica-check: ## R3-4: replica streams, read-your-writes on the stack, replication lag
+	$(need_docker)
+	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash $(SCRIPTS)/replica-check.sh
 
 postman: ## Run every REST request of tests/postman with newman against the running stack
 	$(need_docker)

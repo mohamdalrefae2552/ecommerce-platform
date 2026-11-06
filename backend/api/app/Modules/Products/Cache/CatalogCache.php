@@ -6,6 +6,7 @@ namespace App\Modules\Products\Cache;
 
 use Closure;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 
@@ -30,7 +31,10 @@ final readonly class CatalogCache
     /** Shape of the cached values; change it when their structure changes. */
     private const string SHAPE = 's1';
 
-    public function __construct(private Repository $cache) {}
+    public function __construct(
+        private Repository $cache,
+        private DatabaseManager $db,
+    ) {}
 
     /**
      * @template T of array
@@ -48,7 +52,7 @@ final readonly class CatalogCache
             return $cached;
         }
 
-        $value = $load();
+        $value = $this->fromPrimary($load);
         $this->cache->put($key, $value, $this->ttl());
 
         return $value;
@@ -73,7 +77,7 @@ final readonly class CatalogCache
             return $cached;
         }
 
-        $value = $load();
+        $value = $this->fromPrimary($load);
 
         if ($value !== null) {
             $this->cache->put($key, $value, $this->ttl());
@@ -114,6 +118,21 @@ final readonly class CatalogCache
     private function freshVersion(): int
     {
         return (int) Carbon::now()->getTimestampMs();
+    }
+
+    /**
+     * A cache fill reads the primary, never the replica (ADR-0014): right
+     * after an edit the replica may still have the old row, which would
+     * otherwise be stored under the new version until the TTL.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $load
+     * @return T
+     */
+    private function fromPrimary(Closure $load): mixed
+    {
+        return $this->db->connection()->usingWritePdo(static fn (): mixed => $load());
     }
 
     private function ttl(): int
