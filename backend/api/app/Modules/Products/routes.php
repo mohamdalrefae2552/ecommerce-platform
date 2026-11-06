@@ -16,9 +16,12 @@ use Illuminate\Support\Facades\Route;
 | with the "api" middleware group.
 */
 
-Route::get('/categories', ListCategoriesController::class);
-Route::get('/products', ListProductsController::class);
-Route::get('/products/{productId}', ShowProductController::class);
+// Public catalogue reads: the same bytes for every caller, so ETag/304 apply.
+Route::middleware('etag')->group(function (): void {
+    Route::get('/categories', ListCategoriesController::class);
+    Route::get('/products', ListProductsController::class);
+    Route::get('/products/{productId}', ShowProductController::class);
+});
 Route::post('/products', CreateProductController::class)->middleware(['auth', 'can:create,'.Product::class]);
 Route::patch('/products/{productId}', UpdateProductController::class)->middleware(['auth', 'can:update,'.Product::class]);
 Route::put('/products/{productId}/stock', AdjustStockController::class)->middleware(['auth', 'can:adjustStock,'.Product::class]);

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Shared\Http\Middleware\EnforceRequestBody;
+use App\Shared\Http\Middleware\EntityTag;
 use App\Shared\Http\Middleware\ForceJsonResponse;
 use App\Shared\Http\Middleware\RequestId;
 use App\Shared\Http\Middleware\SecurityHeaders;
@@ -25,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // X-Request-Id and the security headers. RequestId runs first.
         $middleware->prepend([RequestId::class, SecurityHeaders::class, ForceJsonResponse::class]);
         $middleware->api(append: [EnforceRequestBody::class]);
+        // ETag + 304 for the public catalogue reads only (requirement 3).
+        $middleware->alias(['etag' => EntityTag::class]);
         // General limit: 120 per minute per user or IP (docs/04 section 3).
         $middleware->throttleApi();
         // php-fpm is reached over FastCGI from edge: REMOTE_ADDR is the real

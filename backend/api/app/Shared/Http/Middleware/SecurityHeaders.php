@@ -10,7 +10,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Security headers on every API response (docs/04 section 4, R1-SEC3).
- * HSTS is only sent over HTTPS; authenticated responses are never cached.
+ * HSTS is only sent over HTTPS; authenticated responses are never cached,
+ * except the public catalogue reads tagged by EntityTag (no user data).
  */
 final class SecurityHeaders
 {
@@ -39,7 +40,11 @@ final class SecurityHeaders
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 
-        if ($request->headers->has('Authorization') || $request->cookies->has('refresh_token')) {
+        // Public catalogue reads (EntityTag) are identical for every caller:
+        // they keep `no-cache` + ETag even when a token is sent.
+        $publicRead = $request->attributes->get(EntityTag::PUBLIC_REVALIDATE) === true;
+
+        if (! $publicRead && ($request->headers->has('Authorization') || $request->cookies->has('refresh_token'))) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
 

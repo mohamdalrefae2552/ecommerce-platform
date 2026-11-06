@@ -60,6 +60,8 @@ Cache-Control: no-store            (للردود المصادَق عليها)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (فقط إن كان الطلب HTTPS)
 ```
 وإزالة: `X-Powered-By` (`expose_php=Off`)، `Server` version (`server_tokens off`).
+
+**استثناء واحد (المتطلب 3، ETag):** قراءات الكتالوج العامة (`GET /categories`، `GET /products`، `GET /products/{id}`) تُرسل `ETag` و `Cache-Control: no-cache, private` **حتى مع وجود token**، لأن ردها نفسه لكل المستخدمين ولا يحوي بيانات مستخدم: المتصفح يحتفظ بالنسخة لكن يتحقق منها قبل كل استعمال (304 إن لم تتغير)، والكاش المشترك لا يخزّنها. كل ما عداها (الطلبات، الإشعارات، `auth/me`) يبقى `no-store` بلا ETag (اختبار `EntityTagTest`).
 ### على الواجهة (nginx `edge`)
 CSP مناسبة لـ SPA: `default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` + بقية الترويسات أعلاه. Swagger UI على `/docs` بـ CSP خاصة به (يحتاج inline styles).
 
