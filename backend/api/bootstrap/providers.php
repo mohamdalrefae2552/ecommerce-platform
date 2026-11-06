@@ -7,9 +7,11 @@ use App\Modules\Orders\Providers\OrdersServiceProvider;
 use App\Modules\Products\Providers\ProductsServiceProvider;
 use App\Modules\Users\Providers\UsersServiceProvider;
 use App\Shared\Auth\AuthServiceProvider;
+use App\Shared\Database\DatabaseServiceProvider;
 use App\Shared\Inventory\InventoryServiceProvider;
 
 return [
+    DatabaseServiceProvider::class,
     AuthServiceProvider::class,
     InventoryServiceProvider::class,
     UsersServiceProvider::class,

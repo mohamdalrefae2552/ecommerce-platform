@@ -1,0 +1,48 @@
+Pager usage is off.
+CREATE INDEX
+ANALYZE
+### Q1 admin orders: count
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Finalize Aggregate (actual time=10.801..14.007 rows=1.00 loops=1)
+   Buffers: shared hit=205
+   ->  Gather (actual time=10.580..13.998 rows=3.00 loops=1)
+         Workers Planned: 2
+         Workers Launched: 2
+         Buffers: shared hit=205
+         ->  Partial Aggregate (actual time=7.006..7.007 rows=1.00 loops=3)
+               Buffers: shared hit=205
+               ->  Parallel Index Only Scan using orders_user_id_idempotency_key_unique on orders (actual time=0.032..4.225 rows=66672.33 loops=3)
+                     Heap Fetches: 50
+                     Index Searches: 1
+                     Buffers: shared hit=205
+ Planning:
+   Buffers: shared hit=32 read=1
+ Planning Time: 0.479 ms
+ Execution Time: 14.117 ms
+(16 rows)
+
+### Q2 admin orders: page 10
+                                                                   QUERY PLAN                                                                   
+------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.826..0.889 rows=20.00 loops=1)
+   Buffers: shared hit=785 read=4
+   ->  Index Scan Backward using orders_created_at_id_index on orders (actual time=0.076..0.876 rows=200.00 loops=1)
+         Index Searches: 1
+         Buffers: shared hit=785 read=4
+         SubPlan 1
+           ->  Aggregate (actual time=0.003..0.003 rows=1.00 loops=200)
+                 Buffers: shared hit=601
+                 ->  Index Only Scan using order_items_order_id_product_id_unique on order_items (actual time=0.002..0.002 rows=2.37 loops=200)
+                       Index Cond: (order_id = orders.id)
+                       Heap Fetches: 0
+                       Index Searches: 200
+                       Buffers: shared hit=601
+ Planning:
+   Buffers: shared hit=107
+ Planning Time: 0.981 ms
+ Execution Time: 0.933 ms
+(17 rows)
+
+### Q3 admin orders filtered by status: count + page 10
+DROP INDEX
