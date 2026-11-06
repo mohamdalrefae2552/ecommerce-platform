@@ -1,0 +1,11 @@
+
+=== R3 performance (baseline) ===
+  run: baseline, 60s per scenario, 60 customers, scale 1
+  endpoint           p50 ms   p95 ms   p99 ms   avg ms   max ms  304 %   reqs
+  products_list      1004.2   3804.4   3970.9   1520.4   4071.5    0.0   2013
+  product_details     985.8   3801.1   3974.5   1495.2   4050.2    0.0   1725
+  categories          974.2   3748.6   3930.1   1471.8   4068.1    0.0    575
+  my_orders          1001.4   3834.2   4015.3   1505.0   4107.1    0.0    862
+  admin_orders       1340.0   3868.8   4048.8   1648.5   4136.6    0.0     90
+  http requests: 5336, failed: 0.06%, 429: 0, dropped iterations (load not offered: no free VU): 228
+  result: PASS

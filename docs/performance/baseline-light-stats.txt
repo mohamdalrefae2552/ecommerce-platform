@@ -1,0 +1,11 @@
+container        avg CPU%  peak CPU%   peak MiB  samples
+api                  44.3       58.7         75       19
+db-app               38.4       56.9        345       19
+inventory             2.8       21.7        374       19
+toxiproxy             1.6        4.7         10       19
+edge                  1.4        4.0         10       19
+db-inventory          1.1        5.2         65       19
+db-app-test           0.8        4.1         98       19
+swagger               0.4        2.8         14       19
+scheduler             0.4        2.9         38       19
+mailpit               0.4        3.6          8       19
