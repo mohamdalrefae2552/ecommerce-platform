@@ -1,5 +1,5 @@
 # Merge gate for main (W-1). Job ids are the required status checks in the
-# branch-protection command (docs/07 section 7): contracts, api, inventory,
+# branch-protection command (docs/07 section 6): contracts, api, inventory,
 # web, e2e. A job skipped by the path filter counts as passing; e2e always
 # runs on pull requests to main.
 name: ci

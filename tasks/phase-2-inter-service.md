@@ -1,7 +1,7 @@
 # المرحلة 2 — المتطلب الثاني: التواصل بين الخدمات (gRPC)
 
 > المرجع: `docs/00` (R2-*)، `docs/03`، `docs/05` (المصدر الحاسم للسلوك). كل سطر في مصفوفة الفشل `docs/05` §4 = اختبار.
-> التوازي: spring-engineer (الخادم) ‖ laravel-engineer (العميل خلف `InventoryGateway` مع Fake ثم الحقيقي) ‖ react-engineer (UX على MSW) ‖ QA (race + chaos).
+> التوازي: INV (Spring) (الخادم) ‖ API (Laravel) (العميل خلف `InventoryGateway` مع Fake ثم الحقيقي) ‖ WEB (React) (UX على MSW) ‖ QA (race + chaos).
 
 ---
 ## Lead
@@ -17,7 +17,7 @@
 - معايير القبول: `chaos-latency MS=3000` ثم grpcurl بـ `-max-time 1` ⇒ يفشل بالمهلة؛ `chaos-reset` ⇒ ينجح.
 
 ---
-## Backend — spring-engineer
+## Backend — INV (Spring)
 
 ### P2-INV-01 · المخطط والمستودعات
 - العضو: B · الفرع: `feat/r2-inventory-service` · يعتمد على: G1
@@ -53,7 +53,7 @@
 - **PR:** `feat/r2-inventory-service`.
 
 ---
-## Backend — laravel-engineer
+## Backend — API (Laravel)
 
 ### P2-API-01 · توليد stubs والـ Gateway
 - العضو: A · الفرع: `feat/r2-inventory-gateway` · يعتمد على: P2-LEAD-01
@@ -91,7 +91,7 @@
 - **PR:** `feat/r2-order-saga` (P2-API-03..05).
 
 ---
-## Frontend — react-engineer
+## Frontend — WEB (React)
 
 ### P2-WEB-01 · تجربة المخزون والأعطال
 - العضو: B · الفرع: `feat/r2-web-stock-ux` · يعتمد على: P2-LEAD-01
@@ -100,7 +100,7 @@
 - **PR:** `feat/r2-web-stock-ux`.
 
 ---
-## Quality — qa-security-engineer
+## Quality — QA
 
 ### P2-QA-01 · إثبات الـ Race Condition عبر HTTP (PROOF-R2-1)
 - العضو: B · الفرع: `test/r2-race-chaos` · يعتمد على: دمج `feat/r2-order-saga` و `feat/r2-inventory-service`
@@ -114,5 +114,5 @@
 - معايير القبول: `make verify-e2e` و `make demo-r2` أخضران.
 
 ### P2-QA-03 · مراجعة مستقلة للمرحلة
-- الخطوات: `code-reviewer` + `security-checklist` على `main`، مع تركيز: كل مسار شبكي له deadline، كل نتيجة مجهولة لها تعويض، لا قراءة لقاعدة المستودع من التطبيق (grep + فحص الشبكة).
+- الخطوات: مراجعة كود مستقلة + قائمة الفحص الأمني على `main`، مع تركيز: كل مسار شبكي له deadline، كل نتيجة مجهولة لها تعويض، لا قراءة لقاعدة المستودع من التطبيق (grep + فحص الشبكة).
 - معايير القبول: لا ملاحظات High/Critical ⇒ **G2**.

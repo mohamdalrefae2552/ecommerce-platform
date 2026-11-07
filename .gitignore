@@ -38,8 +38,5 @@ tests/load/results/
 Thumbs.db
 desktop.ini
 
-# --- Claude Code local state ---
-.claude/settings.local.json
-
 # --- local caches used by make targets ---
 .cache/

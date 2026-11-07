@@ -1,4 +1,4 @@
-# tests/ — system-level proofs (owner: qa-security-engineer)
+# tests/ — system-level proofs
 
 Black-box tests written from the contract (`contracts/`) and the requirements
 (`docs/00`), run against the full compose stack through `edge`.

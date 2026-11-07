@@ -6,13 +6,13 @@
 
 ## القرار
 ```
-backend/api/         Laravel 13 (PHP)       — laravel-engineer
-backend/inventory/   Spring Boot 4.1 (Java) — spring-engineer
-frontend/            React 19 + Vite        — react-engineer
+backend/api/         Laravel 13 (PHP)
+backend/inventory/   Spring Boot 4.1 (Java)
+frontend/            React 19 + Vite
 ```
-- كل خدمة خلفية تبقى في مجلدها الفرعي المستقل: لغتان وأداتا بناء وصورتا Docker وقاعدتا بيانات مختلفة؛ دمجهما في مجلد واحد يكسر R2-S1/R2-S2 بصرياً ويخلط ملكية الوكلاء.
+- كل خدمة خلفية تبقى في مجلدها الفرعي المستقل: لغتان وأداتا بناء وصورتا Docker وقاعدتا بيانات مختلفة؛ دمجهما في مجلد واحد يكسر R2-S1/R2-S2 بصرياً ويخلط ملكية المكوّنات.
 - `contracts/`، `infra/`، `tests/`، `docs/`، `tasks/` تبقى في الجذر لأنها مشتركة بين الطرفين.
-- كل المراجع (CLAUDE.md، docs، tasks، تعريفات الوكلاء، hooks، `buf.gen.yaml`) حُدّثت للمسارات الجديدة.
+- كل المراجع (docs، tasks، `Makefile`، `compose*.yaml`، `buf.gen.yaml`) حُدّثت للمسارات الجديدة.
 
 ## البدائل المرفوضة
 - **`backend/` = Laravel فقط والمخزون خارجه:** يكسر طلب "الخلفية في مجلد واحد".

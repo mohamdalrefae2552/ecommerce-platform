@@ -1,75 +1,39 @@
-# 07 — الفريق (بشر + وكلاء) وسير العمل في Git
+# 07 — الفريق وسير العمل في Git
 
-## 1. الطبقتان
-- **الفريق البشري (عضوان: A و B):** يملكان القرار، يراجعان، يفتحان طلبات الدمج من حساباتهما، ويُسألان في المقابلة.
-- **فريق الوكلاء (Claude Code Agent Teams):** ينفّذ. الجلسة التي يفتحها العضو المناوب هي **Lead**.
+## 1. الفريق
+- **عضوان (A و B):** يملكان القرار، يكتبان الكود، يراجعان، يفتحان طلبات الدمج من حساباتهما، ويُسألان في المقابلة عن أي جزء (W-3).
 
-```mermaid
-flowchart TB
-  H[العضو المناوب A أو B] <--> L[Lead<br/>الجلسة الرئيسية]
-  subgraph BE[فريق Backend]
-    LE[laravel-engineer<br/>backend/api]
-    SE[spring-engineer<br/>backend/inventory]
-  end
-  subgraph FQ[فريق Frontend & Quality]
-    RE[react-engineer<br/>frontend]
-    QA[qa-security-engineer<br/>tests/*]
-  end
-  L --> LE & SE & RE & QA
-  LE <-. gRPC semantics .-> SE
-  RE <-. API behaviour .-> LE
-  QA <-. proofs .-> LE & SE & RE
-  L -. قبل كل PR .-> CR[code-reviewer<br/>subagent قراءة فقط]
-```
+## 2. المكوّنات والمجلدات
+| المكوّن | المجلد | ملاحظات |
+|---|---|---|
+| العقود | `contracts/` | تُعدَّل أولاً وفي PR مستقل (contract-first — ADR-0002) |
+| التطبيق الأساسي (Laravel) | `backend/api/**` | `generated/` مولَّد بـ `make gen` ولا يُعدّل يدوياً |
+| خدمة المخزون (Spring Boot) | `backend/inventory/**` | |
+| الواجهة (React) | `frontend/**` | `src/api/schema.d.ts` مولَّد بـ `make gen` |
+| الاختبارات والإثباتات | `tests/e2e/` `tests/load/` `tests/security/` `tests/postman/` | |
+| البنية التحتية والوثائق | `infra/` `compose*.yaml` `Makefile` `.github/` `docs/` `tasks/` | |
+- كل commit يمسّ مكوّناً واحداً قدر الإمكان، ويُضاف بمسار صريح (`git add backend/api`) لا `git add -A`.
 
-## 2. الأدوار
-| الوكيل | يملك | لا يلمس | يتواصل مع |
-|---|---|---|---|
-| Lead | `contracts/` `docs/` `tasks/` `infra/` `compose*.yaml` `Makefile` `.github/` `CLAUDE.md` | كود المكوّنات | الكل + الإنسان |
-| laravel-engineer | `backend/api/**` (عدا `generated/`) | العقود | spring (دلالات gRPC)، react (سلوك API) |
-| spring-engineer | `backend/inventory/**` | العقود | laravel |
-| react-engineer | `frontend/**` (عدا `src/api/schema.d.ts`) | العقود | laravel |
-| qa-security-engineer | `tests/e2e/` `tests/load/` `tests/security/` | كود الإنتاج (يبلّغ عن العيوب فقط) | الكل |
-| code-reviewer (subagent) | — قراءة فقط | كل شيء | Lead |
-
-## 3. بروتوكول التواصل بين الوكلاء
-رسائل `SendMessage` قصيرة ومهيكلة:
-```
-[CONTRACT-REQUEST] from: laravel-engineer
-need: field `reservation_id` on Order resource (admin only)
-why: admin UI must show it for reconciliation debugging
-proposal: components.schemas.OrderAdmin.reservation_id: string(uuid)
-blocking: P2-API-06
-```
-| النوع | المعنى |
-|---|---|
-| `[CONTRACT-REQUEST]` | طلب تغيير عقد ⇒ للـ Lead فقط |
-| `[QUESTION]` | غموض ⇒ للـ Lead (يسأل الإنسان إن لزم) |
-| `[HANDOFF]` | "انتهيت من X، جاهز للاستهلاك" + الفرع + الأوامر للتحقق |
-| `[DEFECT]` | من QA: خطوات إعادة الإنتاج + المتوقع/الفعلي + الاختبار الفاشل |
-| `[BLOCKED]` | متوقف على شيء + ما جرّبته |
-لا يُقبل "تم" دون أوامر تحقق قابلة للتشغيل.
-
-## 4. مجلد عمل واحد (ADR-0012 — يستبدل الـ worktrees)
-- كل الوكلاء يعملون في `C:\dev\ecommerce-platform` مباشرة، على **فرع الدفعة** الذي يحدده الـ Lead (مثل `chore/p0-platform`، `feat/r1-auth-jwt`).
-- الملكية بالمجلد (§2) تمنع التعارض: لا يكتب وكيلان نفس الملف.
-- **commit لكل مهمة**، والوكيل يضيف ملفات نطاقه فقط: `git add backend/api` — ممنوع `git add -A` / `git add .` / `git commit -a`.
-- فشل commit بسبب `index.lock` ⇒ انتظر وأعد المحاولة (وكيل آخر يعمل commit الآن)؛ لا تحذف القفل.
-- التكامل (`make up`، E2E، demo) يعمل مباشرة على المجلد نفسه.
-- `make wt` يبقى متاحاً لتجربة معزولة استثنائية فقط.
-
-## 5. الفروع والـ Commits
-- `main` محمي. فروع: `feat/r{1|2}-<scope>`, `fix/…`, `test/…`, `chore/…`, `docs/…`.
+## 3. الفروع والـ Commits
+- `main` محمي. فروع: `feat/r{N}-<scope>`, `fix/…`, `test/…`, `chore/…`, `docs/…`.
 - Conventional Commits بالإنجليزية: `feat(orders): enforce owner-only access with 404 on foreign orders`.
 - commit صغير لكل خطوة منطقية؛ لا commit يكسر البناء.
 - Squash merge، تاريخ خطي.
 
-## 6. طلبات الدمج (PR) — W-1, W-2
-1. الوكيل يكمل المهمة ⇒ `make verify-<component>` أخضر.
-2. الـ Lead يستدعي `code-reviewer` على `git diff origin/main...HEAD` ⇒ يصلح الوكيل الملاحظات.
-3. skill `ship-pr` يحضّر الوصف (القالب `.github/pull_request_template.md`).
-4. **العضو المالك** يدفع الفرع ويفتح الـ PR من حسابه (`gh pr create`) — الـ Lead لا يدفع ولا يدمج دون إذن صريح (إعدادات الصلاحيات تفرض السؤال).
-5. **العضو الآخر** يراجع على GitHub (يقرأ الكود فعلاً — سيُسأل عنه، W-3)، ويوافق ⇒ دمج.
+## 4. تشغيل الفحوص قبل كل PR
+| الأمر | ما يفحصه |
+|---|---|
+| `make lint-contracts` | `buf lint` + `buf breaking` + Redocly lint على OpenAPI |
+| `make verify-api` | Pint + Larastan + Pest (بما فيها اختبارات الحدود Arch ومطابقة العقد) |
+| `make verify-inventory` | Spotless + ErrorProne + اختبارات JUnit/Testcontainers + JaCoCo |
+| `make verify-web` | ESLint + tsc strict + Vitest + build |
+| `make verify` | كل ما سبق + E2E (بوابة الدمج، تطابق CI) |
+
+## 5. طلبات الدمج (PR) — W-1, W-2
+1. صاحب الفرع يكمل المهمة ⇒ `make verify-<component>` أخضر.
+2. يكتب الوصف وفق القالب `.github/pull_request_template.md`.
+3. **العضو المالك** يدفع الفرع ويفتح الـ PR من حسابه (`gh pr create`).
+4. **العضو الآخر** يراجع على GitHub (يقرأ الكود فعلاً — سيُسأل عنه، W-3)، ويوافق ⇒ دمج.
 
 ### توزيع الـ PRs على العضوين (يضمن W-2 مع توازن الفهم)
 | PR | المتطلب | المالك | المراجع |
@@ -91,7 +55,7 @@ blocking: P2-API-06
 | `test/r2-race-chaos` (k6 + toxiproxy + demo-r2) | 2 | B | A |
 ⇒ كل عضو له ≥ 4 PRs في المتطلب 1 و ≥ 2 في المتطلب 2، وكل عضو راجع جانب زميله.
 
-## 7. حماية الفرع الرئيسي
+## 6. حماية الفرع الرئيسي
 > ملاحظة: حماية الفروع للمستودعات **الخاصة** تتطلب GitHub Pro/Team (مجاني للطلاب عبر GitHub Education) أو اجعل المستودع عاماً.
 ```bash
 gh api -X PUT "repos/{owner}/{repo}/branches/main/protection" --input - <<'JSON'
@@ -109,10 +73,7 @@ JSON
 ```
 أسماء `contexts` يجب أن تطابق أسماء jobs في `.github/workflows/ci.yml`.
 
-## 8. إيقاع كل مرحلة
-1. الـ Lead في **Plan mode** يقرأ ملف المرحلة ويعرض خطة التوزيع ⇒ الإنسان يوافق.
-2. Lead ينشئ worktrees ويطلق الوكلاء بأسماء ثابتة وأنواع subagent (انظر `KICKOFF.md`).
-3. الوكلاء ينفذون وفق قائمة المهام المشتركة (5–6 مهام لكل وكيل كحد أقصى في الدفعة).
-4. hooks: `TaskCompleted` يشغّل تحقق المكوّن ويمنع الإغلاق إن فشل؛ `TeammateIdle` يمنع الخمول مع تغييرات غير مُلتزمة.
-5. مراجعة ⇒ PR ⇒ دمج ⇒ rebase ⇒ الدفعة التالية.
-6. نهاية المرحلة: `make verify` + `make demo-rN` من `main` + تحديث `docs/08-interview-prep.md`.
+## 7. إيقاع كل مرحلة
+1. قراءة ملف المرحلة في `tasks/` وتوزيع المهام على العضوين.
+2. تنفيذ كل مهمة على فرعها ⇒ فحوص خضراء ⇒ PR ⇒ مراجعة الزميل ⇒ دمج.
+3. نهاية المرحلة: `make verify` + `make demo-rN` من `main` + تحديث `docs/08-interview-prep.md`.

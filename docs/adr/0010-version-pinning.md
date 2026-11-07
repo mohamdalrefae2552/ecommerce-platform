@@ -2,7 +2,7 @@
 **الحالة:** مقبول — 2026-11-01 (P0-LEAD-02)
 
 ## السياق
-الإصدارات الرئيسية محددة في `CLAUDE.md` §2. الحزم الفرعية يجب التحقق من توافقها مع PHP 8.4 / Laravel 13 / Java 25 / Spring Boot 4.1 / Vite 8 **قبل** الاعتماد عليها. التحقق تمّ في 2026-11-01 من السجلات الرسمية مباشرة (Packagist p2، Maven Central و BOM الخاص بـ Spring Boot 4.1.2، `npm view`، GitHub releases، Docker Hub، PECL، قائمة ISO 4217 من SIX).
+الإصدارات الرئيسية محددة في `README.md` (جدول المكوّنات). الحزم الفرعية يجب التحقق من توافقها مع PHP 8.4 / Laravel 13 / Java 25 / Spring Boot 4.1 / Vite 8 **قبل** الاعتماد عليها. التحقق تمّ في 2026-11-01 من السجلات الرسمية مباشرة (Packagist p2، Maven Central و BOM الخاص بـ Spring Boot 4.1.2، `npm view`، GitHub releases، Docker Hub، PECL، قائمة ISO 4217 من SIX).
 
 ## القرار — الإصدارات المثبتة
 ### PHP — `backend/api`
@@ -21,7 +21,6 @@
 | mlocati/docker-php-extension-installer | بناء الامتدادات | `2.13.1` | 2026-10-29 | ✅ | github.com/mlocati/docker-php-extension-installer |
 | intervention/image | إعادة ترميز الصور | `^3.11.10` | 2026-10-05 | ✅ (v4 موجود؛ نبقى على 3 كما في الخطة — ما زال مُصاناً) | packagist.org/packages/intervention/image |
 | **studio-design/openapi-contract-testing** | `assertMatchesContract()` | `^2.9.0` (opis/json-schema، JSON Schema 2020-12) | 2026-10-30 | ✅ **OpenAPI 3.1 أصيل** | github.com/studio-design/openapi-contract-testing |
-| laravel/boost (dev، اختياري) | MCP | `^2.10.4` | 2026-10-29 | ✅ | packagist.org/packages/laravel/boost |
 
 ### Java — `backend/inventory`
 | الحزمة | الغرض | الإصدار المثبت | تاريخ الإصدار | التوافق | المصدر |

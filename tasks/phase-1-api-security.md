@@ -4,7 +4,7 @@
 > التوازي: فريق Backend (API) ‖ فريق Frontend يعمل على MSW من العقد ‖ QA يكتب الإثباتات من العقد ويشغّلها حين يندمج الـ backend.
 
 ---
-## Backend — laravel-engineer
+## Backend — API (Laravel)
 
 ### P1-API-01 · النواة المشتركة: الأخطاء والترويسات والتتبع
 - العضو: A · الفرع: `feat/r1-auth-jwt` · يعتمد على: G0
@@ -77,7 +77,7 @@
 - معايير القبول: إنشاء طلب ⇒ إشعار database واحد + بريد واحد (`Notification::fake` في unit، و Mailpit API في اختبار تكامل واحد)؛ تغيير الحالة ⇒ إشعار؛ فشل المعاملة ⇒ لا إشعار (afterCommit)؛ مطابقة العقد.
 
 ---
-## Frontend — react-engineer (يبدأ فور G0 على MSW)
+## Frontend — WEB (React) (يبدأ فور G0 على MSW)
 
 ### P1-WEB-01 · المصادقة في الواجهة
 - العضو: B · الفرع: `feat/r1-web` · يعتمد على: G0
@@ -105,7 +105,7 @@
 - **PR:** `feat/r1-web` بعد استبدال MSW بالـ API الحقيقي والتحقق يدوياً + E2E من QA.
 
 ---
-## Quality — qa-security-engineer
+## Quality — QA
 
 ### P1-QA-01 · ملفات HTTP وسكربت demo-r1
 - العضو: A · الفرع: `test/r1-security-proofs` · يعتمد على: G0
@@ -120,5 +120,5 @@
 
 ### P1-QA-03 · مراجعة أمنية مستقلة للمرحلة
 - العضو: A/B · يعتمد على: كل مهام P1 مدموجة
-- الخطوات: طبّق skill `security-checklist` على `main`؛ كل ملاحظة ⇒ `[DEFECT]` للمالك + مهمة جديدة `P1-FIX-NN`.
+- الخطوات: طبّق قائمة الفحص الأمني (OWASP API Top 10، `docs/04-security.md`) على `main`؛ كل ملاحظة ⇒ بلاغ عيب للمالك + مهمة جديدة `P1-FIX-NN`.
 - معايير القبول: لا ملاحظات بدرجة High/Critical مفتوحة. ثم **G1**.
