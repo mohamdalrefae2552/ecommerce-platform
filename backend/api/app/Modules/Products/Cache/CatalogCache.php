@@ -44,6 +44,10 @@ final readonly class CatalogCache
      */
     public function remember(string $name, Closure $load): array
     {
+        if (! $this->enabled()) {
+            return $load();
+        }
+
         $key = 'catalog:'.self::SHAPE.':v'.$this->version().':'.$name;
         $cached = $this->cache->get($key);
 
@@ -69,6 +73,10 @@ final readonly class CatalogCache
      */
     public function rememberFound(string $name, Closure $load): ?array
     {
+        if (! $this->enabled()) {
+            return $load();
+        }
+
         $key = 'catalog:'.self::SHAPE.':v'.$this->version().':'.$name;
         $cached = $this->cache->get($key);
 
@@ -91,6 +99,10 @@ final readonly class CatalogCache
      */
     public function invalidate(): void
     {
+        if (! $this->enabled()) {
+            return;
+        }
+
         // Initialise first: INCR on a missing key would restart at 1.
         $this->version();
 
@@ -133,6 +145,17 @@ final readonly class CatalogCache
     private function fromPrimary(Closure $load): mixed
     {
         return $this->db->connection()->usingWritePdo(static fn (): mixed => $load());
+    }
+
+    /**
+     * CATALOG_CACHE_ENABLED=false: behaviour before requirement 3 (the
+     * baseline of `make perf-compare`). Switching back must start from an
+     * empty cache, which perf-compare does (writes while disabled do not
+     * invalidate).
+     */
+    private function enabled(): bool
+    {
+        return Config::boolean('catalog.cache_enabled');
     }
 
     private function ttl(): int

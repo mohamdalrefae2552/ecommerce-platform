@@ -6,6 +6,7 @@ namespace App\Shared\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -23,7 +24,8 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * The 304 saves the transfer and the client's work, not the server's: the
  * response is still built to compare its tag (the catalogue cache is what
- * makes that cheap).
+ * makes that cheap). `HTTP_ETAG_ENABLED=false` turns it off (baseline of
+ * the live before/after demo).
  */
 final class EntityTag
 {
@@ -37,7 +39,9 @@ final class EntityTag
     {
         $response = $next($request);
 
-        if (! $request->isMethodCacheable() || $response->getStatusCode() !== Response::HTTP_OK) {
+        if (! Config::boolean('http.etag_enabled')
+            || ! $request->isMethodCacheable()
+            || $response->getStatusCode() !== Response::HTTP_OK) {
             return $response;
         }
 

@@ -30,6 +30,19 @@ use function Pest\Laravel\travel;
 beforeEach(function (): void {
     Mail::fake();
     inventory()->defaultAvailable = 100;
+    // A replica as on the stack. The suite's connection is already open, so
+    // this changes only the middleware's decision, not where SQL goes.
+    config(['database.connections.pgsql.read.host' => ['db-app-replica']]);
+});
+
+it('does nothing when no replica is configured (read host = write host)', function (): void {
+    config(['database.connections.pgsql.read.host' => config('database.connections.pgsql.write.host')]);
+    $customer = User::factory()->create();
+    $product = Product::factory()->create();
+
+    postJson('/api/v1/orders', ['items' => [['product_id' => $product->id, 'quantity' => 1]]], bearer($customer))->assertCreated();
+
+    expect(Cache::has('read-your-writes:user:'.$customer->id))->toBeFalse();
 });
 
 it('splits reads and writes and keeps a request that wrote on the primary (sticky)', function (): void {

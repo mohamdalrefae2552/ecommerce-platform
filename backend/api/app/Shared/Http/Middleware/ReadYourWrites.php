@@ -42,6 +42,12 @@ final readonly class ReadYourWrites
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // No replica configured (DB_READ_HOST = DB_HOST): nothing to decide,
+        // and no cache lookup either (baseline of `make perf-compare`).
+        if (Config::get('database.connections.pgsql.read.host') === Config::get('database.connections.pgsql.write.host')) {
+            return $next($request);
+        }
+
         $connection = $this->db->connection();
         $connection->forgetRecordModificationState();
 

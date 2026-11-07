@@ -12,13 +12,15 @@ out_dir="docs/performance"
 stop="$(mktemp -u)"
 status_file="$(mktemp)"
 trap 'rm -f "$stop" "$status_file"' EXIT
-mkdir -p "$out_dir"
+mkdir -p "$out_dir" .cache/perf
 sampler=""
 
 run_k6() {
+  # .cache/perf (git-ignored): access tokens shared by the two perf-compare runs.
   # shellcheck disable=SC2086 # COMPOSE is a command line with options.
-  $COMPOSE --profile tools run --rm -v "$PWD/$out_dir:/work/out" \
+  $COMPOSE --profile tools run --rm -v "$PWD/$out_dir:/work/out" -v "$PWD/.cache/perf:/work/tokens" \
     -e OUT="$OUT" -e DURATION="${DURATION:-60s}" -e SCALE="${SCALE:-1}" -e CUSTOMERS="${CUSTOMERS:-}" \
+    -e TOKENS_IN="${TOKENS_IN:-}" -e TOKENS_OUT="${TOKENS_OUT:-}" \
     k6 run --quiet /work/tests/load/perf.js 2>&1 && echo 0 >"$status_file" || echo $? >"$status_file"
 }
 

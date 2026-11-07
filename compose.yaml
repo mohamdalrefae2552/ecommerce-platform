@@ -33,11 +33,16 @@ x-api-env: &api-env
   DB_USERNAME: ${DB_USERNAME:-app}
   DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
   # Requirement 3: cache store (catalogue cache, rate limiters) in Redis.
-  # Not taken from .env on purpose: older .env files still say "database".
-  CACHE_STORE: redis
+  # Not CACHE_STORE from .env on purpose: older .env files still say
+  # "database". API_CACHE_STORE=database only for the perf-compare baseline.
+  CACHE_STORE: ${API_CACHE_STORE:-redis}
   REDIS_HOST: redis
   REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (make bootstrap adds it)}
   CATALOG_CACHE_TTL: ${CATALOG_CACHE_TTL:-600}
+  # Requirement 3 toggles, optimised by default; `make perf-compare` turns
+  # them off for its live "before" run and always restores them.
+  CATALOG_CACHE_ENABLED: ${CATALOG_CACHE_ENABLED:-true}
+  HTTP_ETAG_ENABLED: ${HTTP_ETAG_ENABLED:-true}
   SESSION_DRIVER: ${SESSION_DRIVER:-array}
   QUEUE_CONNECTION: ${QUEUE_CONNECTION:-sync}
   MAIL_MAILER: ${MAIL_MAILER:-smtp}

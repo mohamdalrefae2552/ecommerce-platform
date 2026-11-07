@@ -33,6 +33,11 @@ import { counter, report } from './lib/summary.js';
 const SEEDED = int('SEED_CUSTOMER_COUNT', 60);
 const CUSTOMERS = Math.min(int('CUSTOMERS', SEEDED), SEEDED);
 const PASSWORD = __ENV.SEED_CUSTOMER_PASSWORD;
+// `make perf-compare` runs this script twice within the 15-minute token
+// lifetime: the first run saves the access tokens (TOKENS_OUT, a temp file
+// outside the repository) and the second reuses them (TOKENS_IN), so the
+// per-IP login limit (20/min) is not paid twice.
+const REUSED = __ENV.TOKENS_IN ? JSON.parse(open(__ENV.TOKENS_IN)) : null;
 const DURATION = __ENV.DURATION || '60s';
 const OUT = __ENV.OUT || 'perf';
 // Requests per second of each scenario (total ~91.5/s: 1.5/s per customer
@@ -100,9 +105,9 @@ export function setup() {
   }
   if (CUSTOMERS < 1) throw new Error('need at least one seeded customer');
 
-  const admin = login(__ENV.DEV_ADMIN_EMAIL || 'admin@example.test', __ENV.DEV_ADMIN_PASSWORD);
-  const customers = [];
-  for (let n = 1; n <= CUSTOMERS; n += 1) {
+  const admin = REUSED ? REUSED.admin : login(__ENV.DEV_ADMIN_EMAIL || 'admin@example.test', __ENV.DEV_ADMIN_PASSWORD);
+  const customers = REUSED ? REUSED.customers.slice(0, CUSTOMERS) : [];
+  for (let n = customers.length + 1; n <= CUSTOMERS; n += 1) {
     customers.push(login(`customer${n}@example.test`, PASSWORD));
   }
 
@@ -210,9 +215,13 @@ export function handleSummary(data) {
     dropped_iterations: counter(data, 'dropped_iterations'),
   };
 
-  return {
+  const files = {
     stdout: text,
     [`/work/out/${OUT}.json`]: JSON.stringify(result, null, 2),
     [`/work/out/${OUT}.txt`]: text,
   };
+  if (__ENV.TOKENS_OUT && data.setup_data) {
+    files[__ENV.TOKENS_OUT] = JSON.stringify({ admin: data.setup_data.admin, customers: data.setup_data.customers });
+  }
+  return files;
 }
