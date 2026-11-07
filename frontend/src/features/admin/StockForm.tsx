@@ -1,7 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type SyntheticEvent, useRef, useState } from 'react';
+import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Field, serverFieldErrors } from '../../components/forms';
+import { Notice } from '../../components/Notice';
 import { showToast } from '../../components/toast';
 import { catalogKeys } from '../catalog/queries';
 import { useAdjustStock } from './mutations';
@@ -48,11 +51,15 @@ export function StockForm({ productId }: { readonly productId: string }) {
 
   const errors = serverFieldErrors(adjust.error);
   return (
-    <section>
-      <h2>تعديل المخزون (مسؤول)</h2>
-      <form onSubmit={onSubmit} noValidate>
+    <Card
+      title="تعديل المخزون (مسؤول)"
+      description="يُطبَّق التغيير في خدمة المخزون؛ إعادة المحاولة بعد انقطاع لا تطبّقه مرتين."
+      className="admin-tools"
+    >
+      <form onSubmit={onSubmit} noValidate className="form-stack">
         <Field
           label="التغيير في الكمية (موجب للتوريد، سالب للإنقاص)"
+          hint="عدد صحيح غير صفري، حتى مليون قطعة في المرة."
           errors={clientError === null ? errors['delta'] : [clientError]}
         >
           {(props) => (
@@ -79,16 +86,18 @@ export function StockForm({ productId }: { readonly productId: string }) {
             />
           )}
         </Field>
-        <button type="submit" disabled={adjust.isPending}>
-          {adjust.isPending ? 'جارٍ التعديل…' : 'تطبيق'}
-        </button>
+        <div className="form-actions">
+          <Button type="submit" disabled={adjust.isPending}>
+            {adjust.isPending ? 'جارٍ التعديل…' : 'تطبيق'}
+          </Button>
+        </div>
       </form>
       {adjust.isSuccess && (
-        <p role="status" className="success">
+        <Notice role="status" tone="success">
           تم التعديل. الكمية الحالية: {adjust.data.data.available}
-        </p>
+        </Notice>
       )}
       {adjust.error !== null && <ErrorNotice error={adjust.error} />}
-    </section>
+    </Card>
   );
 }

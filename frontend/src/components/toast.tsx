@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { AlertIcon, CheckIcon } from './icons';
 
 interface Toast {
   readonly id: number;
@@ -15,7 +16,7 @@ function emit(next: readonly Toast[]): void {
   for (const listener of listeners) listener();
 }
 
-/** Short success message shown at the bottom of the page for a few seconds. */
+/** Short message shown at the bottom of the page for a few seconds. */
 export function showToast(message: string, kind: Toast['kind'] = 'success'): void {
   const id = nextId;
   nextId += 1;
@@ -42,6 +43,7 @@ export function Toaster() {
     <div className="toasts" role="status" aria-live="polite">
       {current.map((t) => (
         <p key={t.id} className={`toast toast-${t.kind}`}>
+          {t.kind === 'success' ? <CheckIcon /> : <AlertIcon />}
           {t.message}
         </p>
       ))}

@@ -3,9 +3,17 @@ import { Link, useNavigate } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 import { ProblemError } from '../../api/problem';
 import { useSession } from '../../auth/session';
+import { Badge } from '../../components/Badge';
+import { Button, buttonClass } from '../../components/Button';
+import { EmptyState } from '../../components/EmptyState';
 import { ErrorNotice } from '../../components/ErrorNotice';
+import { CartIcon, ImageIcon, TrashIcon } from '../../components/icons';
+import { Notice } from '../../components/Notice';
+import { PageHeader } from '../../components/PageHeader';
+import { QuantityPicker } from '../../components/QuantityPicker';
 import { showToast } from '../../components/toast';
-import { formatMinor } from '../../lib/format';
+import { cx } from '../../lib/cx';
+import { formatMinor, imagePath } from '../../lib/format';
 import { productQuery } from '../catalog/queries';
 import { useCreateOrder } from '../orders/mutations';
 import {
@@ -40,6 +48,7 @@ export function CartPage() {
 
   const productNames = new Map(lines.map((l) => [l.productId, l.name]));
   const total = lines.reduce((sum, l) => sum + l.unitPriceMinor * l.quantity, 0);
+  const units = lines.reduce((sum, l) => sum + l.quantity, 0);
   const isAdmin = session.status === 'authenticated' && session.user.role === 'admin';
 
   function placeOrder() {
@@ -65,116 +74,146 @@ export function CartPage() {
     );
   }
 
-  return (
-    <section>
-      <h1>السلة</h1>
-      {lines.length === 0 ? (
-        <p>
-          السلة فارغة.{' '}
-          <Link to="/products" search={{ page: 1 }}>
+  if (lines.length === 0) {
+    return (
+      <section>
+        <PageHeader title="السلة" />
+        <EmptyState icon={<CartIcon />} title="السلة فارغة.">
+          <p className="empty-text">أضف منتجات من الكتالوج لتظهر هنا.</p>
+          <Link to="/products" search={{ page: 1 }} className={buttonClass('primary')}>
             تصفح المنتجات
           </Link>
-        </p>
-      ) : (
-        <>
-          <table>
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>سعر الوحدة</th>
-                <th>الكمية</th>
-                <th>المتوفر الآن</th>
-                <th>الإجمالي</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((l) => {
-                const available = availableById.get(l.productId);
-                const tooMany = available !== undefined && l.quantity > available;
-                return (
-                  <tr key={l.productId} className={tooMany ? 'line-short' : undefined}>
-                    <td>{l.name}</td>
-                    <td>{formatMinor(l.unitPriceMinor)}</td>
-                    <td>
-                      <input
-                        type="number"
-                        aria-label={`كمية ${l.name}`}
-                        min={1}
-                        max={MAX_QUANTITY}
-                        value={l.quantity}
-                        onChange={(e) => {
-                          setQuantity(l.productId, Number(e.target.value));
-                        }}
-                      />
-                    </td>
-                    <td>
-                      {available === undefined ? (
-                        <span className="muted">غير معروف</span>
-                      ) : (
-                        <span>المتوفر الآن: {available}</span>
-                      )}
-                      {tooMany && (
-                        <p role="alert" className="degraded">
-                          الكمية المطلوبة أكبر من المتوفر
-                        </p>
-                      )}
-                    </td>
-                    <td>{formatMinor(l.unitPriceMinor * l.quantity)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          removeFromCart(l.productId);
-                        }}
-                      >
-                        حذف
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p>المجموع: {formatMinor(total)}</p>
-          {isAdmin && <p role="alert">حساب المسؤول لا يستطيع إنشاء طلبات.</p>}
+        </EmptyState>
+      </section>
+    );
+  }
+
+  return (
+    <section>
+      <PageHeader
+        title="السلة"
+        subtitle={`${String(units)} قطعة في ${String(lines.length)} منتج`}
+      />
+      <div className="cart-layout">
+        <ul className="cart-lines" aria-label="منتجات السلة">
+          {lines.map((l, i) => {
+            const available = availableById.get(l.productId);
+            const tooMany = available !== undefined && l.quantity > available;
+            const image = stockQueries[i]?.data?.image_url;
+            return (
+              <li key={l.productId} className={cx('card cart-line', tooMany && 'is-short')}>
+                <div className="cart-thumb">
+                  {image === undefined ? <ImageIcon /> : <img src={imagePath(image)} alt="" />}
+                </div>
+                <div className="cart-line-info">
+                  <Link
+                    to="/products/$productId"
+                    params={{ productId: l.productId }}
+                    className="cart-line-name"
+                  >
+                    {l.name}
+                  </Link>
+                  <p className="muted small">سعر الوحدة: {formatMinor(l.unitPriceMinor)}</p>
+                  {available === undefined ? (
+                    <Badge dot>المتوفر الآن: غير معروف</Badge>
+                  ) : (
+                    <Badge dot tone={tooMany ? 'warning' : 'success'}>
+                      المتوفر الآن: {available}
+                    </Badge>
+                  )}
+                  {tooMany && (
+                    <Notice role="alert" tone="warning" className="notice-sm">
+                      الكمية المطلوبة أكبر من المتوفر
+                    </Notice>
+                  )}
+                </div>
+                <div className="cart-line-controls">
+                  <QuantityPicker
+                    label={`كمية ${l.name}`}
+                    value={l.quantity}
+                    max={MAX_QUANTITY}
+                    onChange={(quantity) => {
+                      setQuantity(l.productId, quantity);
+                    }}
+                  />
+                  <p className="cart-line-total">{formatMinor(l.unitPriceMinor * l.quantity)}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="btn-danger-text"
+                    icon={<TrashIcon />}
+                    onClick={() => {
+                      removeFromCart(l.productId);
+                    }}
+                  >
+                    حذف
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <aside className="card order-summary" aria-label="ملخص الطلب">
+          <h2 className="card-title">ملخص الطلب</h2>
+          <dl className="summary-rows">
+            <div>
+              <dt>عدد القطع</dt>
+              <dd>{units}</dd>
+            </div>
+            <div className="summary-total">
+              <dt>المجموع</dt>
+              <dd>{formatMinor(total)}</dd>
+            </div>
+          </dl>
+          {isAdmin && (
+            <Notice role="alert" tone="danger">
+              حساب المسؤول لا يستطيع إنشاء طلبات.
+            </Notice>
+          )}
           {session.status === 'anonymous' && (
-            <p>
-              <Link to="/login" search={{ redirect: '/cart' }}>
-                سجّل الدخول
-              </Link>{' '}
-              لإتمام الطلب.
-            </p>
+            <Notice tone="info">
+              <p>
+                <Link to="/login" search={{ redirect: '/cart' }}>
+                  سجّل الدخول
+                </Link>{' '}
+                لإتمام الطلب.
+              </p>
+            </Notice>
           )}
           {createOrder.error !== null && (
             <ErrorNotice error={createOrder.error} productNames={productNames} />
           )}
           {shortages.length > 0 && (
-            <p>
-              <button
-                type="button"
-                onClick={() => {
-                  applyAvailability(shortages);
-                  createOrder.reset();
-                }}
-              >
-                اطلب المتوفر فقط
-              </button>
-            </p>
+            <Button
+              variant="secondary"
+              block
+              onClick={() => {
+                applyAvailability(shortages);
+                createOrder.reset();
+              }}
+            >
+              اطلب المتوفر فقط
+            </Button>
           )}
-          {elapsedMs !== null && <p>زمن استجابة آخر محاولة: {elapsedMs} مللي ثانية</p>}
-          <button
-            type="button"
+          <Button
+            size="lg"
+            block
             disabled={createOrder.isPending || session.status !== 'authenticated' || isAdmin}
             onClick={placeOrder}
           >
             {createOrder.isPending ? 'جارٍ إنشاء الطلب…' : 'تأكيد الطلب'}
-          </button>{' '}
-          <button type="button" onClick={clearCart}>
+          </Button>
+          <Button variant="ghost" block onClick={clearCart}>
             تفريغ السلة
-          </button>
-        </>
-      )}
+          </Button>
+          {elapsedMs !== null && (
+            <p className="muted small summary-timing">
+              زمن استجابة آخر محاولة: {elapsedMs} مللي ثانية
+            </p>
+          )}
+        </aside>
+      </div>
     </section>
   );
 }

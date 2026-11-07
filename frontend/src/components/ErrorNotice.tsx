@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { ProblemError, UnexpectedResponseError, isAuthError, userMessage } from '../api/problem';
+import { Notice } from './Notice';
 
 interface ErrorNoticeProps {
   readonly error: unknown;
@@ -7,6 +8,11 @@ interface ErrorNoticeProps {
   readonly overrides?: Partial<Record<ProblemError['code'], string>>;
   /** product id to name, to name the short lines of a 409 INSUFFICIENT_STOCK. */
   readonly productNames?: ReadonlyMap<string, string>;
+}
+
+/** Temporary failures (busy, dependency down) read as a warning; the rest as an error. */
+function isTemporary(error: unknown): boolean {
+  return error instanceof ProblemError && (error.status === 429 || error.status === 503);
 }
 
 /** Arabic message for a failed call, with the request id to quote when reporting it. */
@@ -19,10 +25,10 @@ export function ErrorNotice({ error, overrides = {}, productNames }: ErrorNotice
   const shortages = error instanceof ProblemError ? error.shortages : [];
 
   return (
-    <div role="alert">
-      <p>{override ?? userMessage(error)}</p>
+    <Notice role="alert" tone={isTemporary(error) ? 'warning' : 'danger'}>
+      <p className="notice-title">{override ?? userMessage(error)}</p>
       {shortages.length > 0 && (
-        <ul aria-label="المنتجات ذات الكمية غير الكافية">
+        <ul className="notice-list" aria-label="المنتجات ذات الكمية غير الكافية">
           {shortages.map((s) => (
             <li key={s.product_id}>
               {productNames?.get(s.product_id) ?? s.product_id}: المطلوب {s.requested}، المتوفر{' '}
@@ -36,7 +42,11 @@ export function ErrorNotice({ error, overrides = {}, productNames }: ErrorNotice
           <Link to="/login">تسجيل الدخول</Link>
         </p>
       )}
-      {requestId !== null && <p>رقم المتابعة: {requestId}</p>}
-    </div>
+      {requestId !== null && (
+        <p className="notice-meta">
+          رقم المتابعة: <bdi className="mono">{requestId}</bdi>
+        </p>
+      )}
+    </Notice>
   );
 }

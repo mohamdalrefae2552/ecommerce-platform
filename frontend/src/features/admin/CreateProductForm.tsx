@@ -1,8 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { type SyntheticEvent, useState } from 'react';
+import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import { ErrorNotice } from '../../components/ErrorNotice';
 import { Field, type FieldErrors, serverFieldErrors } from '../../components/forms';
+import { ImageIcon } from '../../components/icons';
 import { StockBadge } from '../../components/StockBadge';
 import { showToast } from '../../components/toast';
 import { formatMoney, imagePath } from '../../lib/format';
@@ -75,25 +78,27 @@ export function CreateProductForm() {
   const created = create.isSuccess ? create.data.data : null;
 
   return (
-    <section>
-      <h2>١. إضافة منتج</h2>
+    <Card
+      title="١. إضافة منتج"
+      description="بيانات المنتج وصورته؛ الكمية الابتدائية تُسجَّل في خدمة المخزون."
+    >
       {create.error !== null && <ErrorNotice error={create.error} />}
       {created !== null && (
-        <div className="card created">
-          <p className="success">تمت إضافة المنتج</p>
-          <img src={imagePath(created.image_url)} alt={created.name} />
-          <h3>{created.name}</h3>
-          <p className="price">{formatMoney(created.price)}</p>
-          <p>
+        <div className="created-product">
+          <img src={imagePath(created.image_url)} alt={created.name} className="thumb-lg" />
+          <div className="created-info">
+            <p className="inline-success">تمت إضافة المنتج</p>
+            <h3>{created.name}</h3>
+            <p className="price">{formatMoney(created.price)}</p>
             <StockBadge stock={created.stock} />
-          </p>
-          <Link to="/products/$productId" params={{ productId: created.id }}>
-            فتح صفحة المنتج
-          </Link>
+            <Link to="/products/$productId" params={{ productId: created.id }}>
+              فتح صفحة المنتج
+            </Link>
+          </div>
         </div>
       )}
-      <form onSubmit={onSubmit} noValidate>
-        <Field label="الاسم" errors={errors['name']}>
+      <form onSubmit={onSubmit} noValidate className="form-grid">
+        <Field label="الاسم" hint="من 2 إلى 120 حرفاً." errors={errors['name']}>
           {(props) => (
             <input
               {...props}
@@ -101,31 +106,6 @@ export function CreateProductForm() {
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-              }}
-            />
-          )}
-        </Field>
-        <Field label="الوصف" errors={errors['description']}>
-          {(props) => (
-            <textarea
-              {...props}
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-              }}
-            />
-          )}
-        </Field>
-        <Field label="السعر (ل.س)" errors={errors['price_minor']}>
-          {(props) => (
-            <input
-              {...props}
-              type="number"
-              step="0.01"
-              min="0"
-              value={price}
-              onChange={(e) => {
-                setPrice(e.target.value);
               }}
             />
           )}
@@ -148,7 +128,25 @@ export function CreateProductForm() {
             </select>
           )}
         </Field>
-        <Field label="الكمية الابتدائية" errors={errors['initial_stock']}>
+        <Field label="السعر (ل.س)" hint="مثال: 4500 أو 4500.50" errors={errors['price_minor']}>
+          {(props) => (
+            <input
+              {...props}
+              type="number"
+              step="0.01"
+              min="0"
+              value={price}
+              onChange={(e) => {
+                setPrice(e.target.value);
+              }}
+            />
+          )}
+        </Field>
+        <Field
+          label="الكمية الابتدائية"
+          hint="تُسجَّل في خدمة المخزون عند الحفظ."
+          errors={errors['initial_stock']}
+        >
           {(props) => (
             <input
               {...props}
@@ -161,26 +159,48 @@ export function CreateProductForm() {
             />
           )}
         </Field>
-        <Field label="الصورة" errors={errors['image']}>
+        <Field label="الوصف" errors={errors['description']} className="span-2">
           {(props) => (
-            <input
+            <textarea
               {...props}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
+              rows={3}
+              value={description}
               onChange={(e) => {
-                const file = e.target.files?.[0] ?? null;
-                setImage(file);
-                setPreview(null);
-                if (file !== null) readPreview(file, setPreview);
+                setDescription(e.target.value);
               }}
             />
           )}
         </Field>
-        {preview !== null && <img className="detail-img" src={preview} alt="معاينة الصورة" />}
-        <button type="submit" disabled={create.isPending}>
-          {create.isPending ? 'جارٍ الحفظ…' : 'حفظ المنتج'}
-        </button>
+        <div className="span-2 image-picker">
+          <Field
+            label="الصورة"
+            hint="JPEG أو PNG أو WebP، حتى 2 ميغابايت."
+            errors={errors['image']}
+          >
+            {(props) => (
+              <input
+                {...props}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setImage(file);
+                  setPreview(null);
+                  if (file !== null) readPreview(file, setPreview);
+                }}
+              />
+            )}
+          </Field>
+          <div className="image-preview">
+            {preview === null ? <ImageIcon /> : <img src={preview} alt="معاينة الصورة" />}
+          </div>
+        </div>
+        <div className="span-2 form-actions">
+          <Button type="submit" disabled={create.isPending}>
+            {create.isPending ? 'جارٍ الحفظ…' : 'حفظ المنتج'}
+          </Button>
+        </div>
       </form>
-    </section>
+    </Card>
   );
 }

@@ -2,11 +2,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useRef, useState } from 'react';
 import type { components } from '../../api/schema';
+import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
 import { ErrorNotice } from '../../components/ErrorNotice';
+import { EditIcon, MinusIcon, PlusIcon } from '../../components/icons';
+import { Notice } from '../../components/Notice';
 import { Pagination } from '../../components/Pagination';
+import { ListSkeleton } from '../../components/Skeleton';
 import { StockBadge } from '../../components/StockBadge';
 import { showToast } from '../../components/toast';
-import { formatMoney } from '../../lib/format';
+import { formatMoney, imagePath } from '../../lib/format';
 import { productsQuery } from '../catalog/queries';
 import { useAdjustStock, useUpdateProduct } from './mutations';
 
@@ -26,8 +31,10 @@ function EditProduct({ product }: { readonly product: Product }) {
 
   if (!open) {
     return (
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<EditIcon />}
         onClick={() => {
           setName(product.name);
           setPrice(String(product.price.amount_minor / 100));
@@ -35,7 +42,7 @@ function EditProduct({ product }: { readonly product: Product }) {
         }}
       >
         تعديل
-      </button>
+      </Button>
     );
   }
 
@@ -45,7 +52,7 @@ function EditProduct({ product }: { readonly product: Product }) {
 
   return (
     <form
-      className="stock-control"
+      className="inline-edit"
       onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
@@ -62,6 +69,7 @@ function EditProduct({ product }: { readonly product: Product }) {
       }}
     >
       <input
+        className="input-sm"
         aria-label={`الاسم الجديد: ${product.name}`}
         value={name}
         onChange={(e) => {
@@ -69,6 +77,7 @@ function EditProduct({ product }: { readonly product: Product }) {
         }}
       />
       <input
+        className="input-sm input-num"
         type="number"
         min={0.01}
         step={0.01}
@@ -78,17 +87,20 @@ function EditProduct({ product }: { readonly product: Product }) {
           setPrice(e.target.value);
         }}
       />
-      <button type="submit" disabled={!valid || update.isPending}>
-        حفظ
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(false);
-        }}
-      >
-        إلغاء
-      </button>
+      <div className="button-row">
+        <Button type="submit" size="sm" disabled={!valid || update.isPending}>
+          حفظ
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setOpen(false);
+          }}
+        >
+          إلغاء
+        </Button>
+      </div>
       {update.error !== null && <ErrorNotice error={update.error} />}
     </form>
   );
@@ -132,59 +144,74 @@ function StockRow({ product }: { readonly product: Product }) {
 
   return (
     <tr>
-      <td>
-        <Link to="/products/$productId" params={{ productId: product.id }}>
-          {product.name}
-        </Link>
+      <td data-label="المنتج">
+        <div className="product-cell">
+          <img src={imagePath(product.image_url)} alt="" className="thumb" loading="lazy" />
+          <Link to="/products/$productId" params={{ productId: product.id }}>
+            {product.name}
+          </Link>
+        </div>
       </td>
-      <td>{formatMoney(product.price)}</td>
-      <td>
+      <td data-label="السعر" className="num">
+        {formatMoney(product.price)}
+      </td>
+      <td data-label="المخزون الحالي">
         <StockBadge stock={product.stock} />
       </td>
-      <td>
+      <td data-label="تعديل المخزون">
         <div className="stock-control">
           <input
             type="number"
             min={1}
+            className="input-sm input-num"
             aria-label={`الكمية للتعديل: ${product.name}`}
             value={amount}
             onChange={(e) => {
               setAmount(e.target.value);
             }}
           />
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
+            className="btn-square"
+            aria-label={`إضافة إلى مخزون ${product.name}`}
             disabled={busy}
             onClick={() => {
               apply(n);
             }}
           >
-            +
-          </button>
-          <button
-            type="button"
+            <PlusIcon />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="btn-square"
+            aria-label={`إنقاص من مخزون ${product.name}`}
             disabled={busy}
             onClick={() => {
               apply(-n);
             }}
           >
-            −
-          </button>
-          <button
-            type="button"
+            <MinusIcon />
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={busy || available === null}
             onClick={() => {
               if (available !== null) apply(n - available);
             }}
           >
             تعيين
-          </button>
+          </Button>
         </div>
-        {available === null && <p className="muted">الكمية غير معروفة الآن؛ «تعيين» غير متاح.</p>}
-        {info !== null && <p className="muted">{info}</p>}
+        {available === null && (
+          <p className="muted small">الكمية غير معروفة الآن؛ «تعيين» غير متاح.</p>
+        )}
+        {info !== null && <p className="muted small">{info}</p>}
         {adjust.error !== null && <ErrorNotice error={adjust.error} />}
       </td>
-      <td>
+      <td data-label="تعديل المنتج">
         <EditProduct product={product} />
       </td>
     </tr>
@@ -196,33 +223,37 @@ export function AdminProducts() {
   const products = useQuery(productsQuery(undefined, page));
 
   return (
-    <section>
-      <h2>٢. المنتجات والمخزون</h2>
-      {products.isPending && <p role="status">جارٍ تحميل المنتجات…</p>}
+    <Card
+      title="٢. المنتجات والمخزون"
+      description="«+» و«−» تضيف أو تنقص الكمية المكتوبة، و«تعيين» يجعل المخزون مساوياً لها."
+    >
+      {products.isPending && <ListSkeleton label="جارٍ تحميل المنتجات…" />}
       {products.error !== null && <ErrorNotice error={products.error} />}
       {products.data !== undefined && (
         <>
           {products.data.meta.degraded?.includes('inventory') === true && (
-            <p role="alert" className="degraded">
+            <Notice role="alert" tone="warning">
               خدمة المخزون لا تستجيب حالياً؛ الكميات غير معروفة.
-            </p>
+            </Notice>
           )}
-          <table>
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>السعر</th>
-                <th>المخزون الحالي</th>
-                <th>تعديل المخزون</th>
-                <th>تعديل المنتج</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.data.data.map((p) => (
-                <StockRow key={p.id} product={p} />
-              ))}
-            </tbody>
-          </table>
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>المنتج</th>
+                  <th>السعر</th>
+                  <th>المخزون الحالي</th>
+                  <th>تعديل المخزون</th>
+                  <th>تعديل المنتج</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.data.data.map((p) => (
+                  <StockRow key={p.id} product={p} />
+                ))}
+              </tbody>
+            </table>
+          </div>
           <Pagination
             page={products.data.meta.page}
             lastPage={products.data.meta.last_page}
@@ -230,6 +261,6 @@ export function AdminProducts() {
           />
         </>
       )}
-    </section>
+    </Card>
   );
 }

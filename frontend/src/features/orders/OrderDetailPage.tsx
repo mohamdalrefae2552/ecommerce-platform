@@ -1,15 +1,29 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { useSession } from '../../auth/session';
+import { useState } from 'react';
 import { ProblemError } from '../../api/problem';
-import { showToast } from '../../components/toast';
+import { useSession } from '../../auth/session';
+import { Button } from '../../components/Button';
+import { Card } from '../../components/Card';
+import { EmptyState } from '../../components/EmptyState';
 import { ErrorNotice } from '../../components/ErrorNotice';
-import { StatusPill } from '../../components/StatusPill';
+import { BackIcon, CopyIcon, SearchIcon } from '../../components/icons';
+import { ListSkeleton } from '../../components/Skeleton';
+import { StatusPill, statusTone } from '../../components/StatusPill';
+import { showToast } from '../../components/toast';
 import { formatDate, formatMoney } from '../../lib/format';
 import { StatusChanger } from './StatusChanger';
 import { orderQuery } from './queries';
 import { statusLabels } from './status';
+
+function BackLink() {
+  return (
+    <Link to="/orders" search={{ page: 1 }} className="back-link">
+      <BackIcon />
+      العودة إلى الطلبات
+    </Link>
+  );
+}
 
 export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
   const session = useSession();
@@ -17,84 +31,124 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
   const isAdmin = session.status === 'authenticated' && session.user.role === 'admin';
   const [copied, setCopied] = useState(false);
 
-  if (isPending) return <p role="status">جارٍ تحميل الطلب…</p>;
+  if (isPending) return <ListSkeleton label="جارٍ تحميل الطلب…" rows={3} />;
   if (error !== null) {
+    const notFound = error instanceof ProblemError && error.code === 'NOT_FOUND';
     return (
       <section>
-        {error instanceof ProblemError && error.code === 'NOT_FOUND' && <h1>الطلب غير موجود</h1>}
-        <ErrorNotice error={error} overrides={{ NOT_FOUND: 'الطلب غير موجود' }} />
-        <p>
-          <Link to="/orders" search={{ page: 1 }}>
-            العودة إلى الطلبات
-          </Link>
-        </p>
+        <BackLink />
+        {notFound && <EmptyState icon={<SearchIcon />} title="الطلب غير موجود" titleAs="h1" />}
+        <ErrorNotice
+          error={error}
+          overrides={{ NOT_FOUND: 'لا يوجد طلب بهذا الرقم ضمن الطلبات التي يحق لك عرضها.' }}
+        />
       </section>
     );
   }
 
+  const units = order.items.reduce((sum, item) => sum + item.quantity, 0);
   return (
     <section>
-      <p>
-        <Link to="/orders" search={{ page: 1 }}>
-          العودة إلى الطلبات
-        </Link>
-      </p>
-      <h1>الطلب {order.id}</h1>
-      <p>
-        <button
-          type="button"
-          onClick={() => {
-            void navigator.clipboard.writeText(order.id).then(() => {
-              setCopied(true);
-              showToast('تم نسخ رقم الطلب');
-            });
-          }}
-        >
-          نسخ رقم الطلب
-        </button>
-        {copied && (
-          <span role="status" className="success">
-            {' '}
-            تم النسخ.
-          </span>
-        )}
-      </p>
-      <div>
-        الحالة: <StatusPill status={order.status} />{' '}
-        {isAdmin && <StatusChanger orderId={order.id} status={order.status} />}
+      <BackLink />
+      <div className="card order-head">
+        <div className="order-head-main">
+          <h1 className="order-title">الطلب {order.id}</h1>
+          <p className="muted small">أُنشئ في {formatDate(order.created_at)}</p>
+        </div>
+        <div className="order-head-actions">
+          <StatusPill status={order.status} />
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<CopyIcon />}
+            onClick={() => {
+              void navigator.clipboard.writeText(order.id).then(() => {
+                setCopied(true);
+                showToast('تم نسخ رقم الطلب');
+              });
+            }}
+          >
+            نسخ رقم الطلب
+          </Button>
+          {copied && (
+            <span role="status" className="inline-success">
+              تم النسخ.
+            </span>
+          )}
+        </div>
       </div>
-      <p>المجموع: {formatMoney(order.total)}</p>
-      <h2>المنتجات</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>المنتج</th>
-            <th>سعر الوحدة</th>
-            <th>الكمية</th>
-            <th>الإجمالي</th>
-          </tr>
-        </thead>
-        <tbody>
-          {order.items.map((item) => (
-            <tr key={item.product_id}>
-              <td>{item.product_name}</td>
-              <td>{formatMoney(item.unit_price)}</td>
-              <td>{item.quantity}</td>
-              <td>{formatMoney(item.line_total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <h2>سجل الحالات</h2>
-      <ol>
-        {order.status_history.map((h) => (
-          <li key={`${h.at}-${h.to}`}>
-            {h.from === null ? 'إنشاء' : statusLabels[h.from]} ← {statusLabels[h.to]} (
-            {h.actor_role === 'admin' ? 'مسؤول' : 'زبون'}) — {formatDate(h.at)}
-            {h.note !== null && h.note !== '' && ` — ${h.note}`}
-          </li>
-        ))}
-      </ol>
+
+      <div className="order-layout">
+        <div className="order-main">
+          <Card title="المنتجات" className="card-flush">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>المنتج</th>
+                  <th>سعر الوحدة</th>
+                  <th>الكمية</th>
+                  <th>الإجمالي</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.items.map((item) => (
+                  <tr key={item.product_id}>
+                    <td data-label="المنتج">{item.product_name}</td>
+                    <td data-label="سعر الوحدة" className="num">
+                      {formatMoney(item.unit_price)}
+                    </td>
+                    <td data-label="الكمية">{item.quantity}</td>
+                    <td data-label="الإجمالي" className="num">
+                      {formatMoney(item.line_total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <Card title="سجل الحالات">
+            <ol className="timeline">
+              {order.status_history.map((h) => (
+                <li key={`${h.at}-${h.to}`} className={`timeline-item tone-${statusTone[h.to]}`}>
+                  <span className="timeline-dot" aria-hidden="true" />
+                  <p className="timeline-title">
+                    {h.from === null ? 'إنشاء' : statusLabels[h.from]} ← {statusLabels[h.to]}
+                  </p>
+                  <p className="muted small">
+                    {h.actor_role === 'admin' ? 'مسؤول' : 'زبون'} — {formatDate(h.at)}
+                  </p>
+                  {h.note !== null && h.note !== '' && <p className="timeline-note">{h.note}</p>}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        </div>
+
+        <aside className="order-side">
+          <Card title="الملخص">
+            <dl className="summary-rows">
+              <div>
+                <dt>الحالة</dt>
+                <dd>{statusLabels[order.status]}</dd>
+              </div>
+              <div>
+                <dt>عدد القطع</dt>
+                <dd>{units}</dd>
+              </div>
+              <div className="summary-total">
+                <dt>المجموع</dt>
+                <dd>{formatMoney(order.total)}</dd>
+              </div>
+            </dl>
+          </Card>
+          {isAdmin && (
+            <Card title="تغيير الحالة" description="الانتقالات المسموحة من الحالة الحالية فقط.">
+              <StatusChanger orderId={order.id} status={order.status} />
+            </Card>
+          )}
+        </aside>
+      </div>
     </section>
   );
 }

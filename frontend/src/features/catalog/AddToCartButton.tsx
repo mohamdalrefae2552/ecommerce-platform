@@ -1,12 +1,21 @@
 import { useState } from 'react';
 import type { components } from '../../api/schema';
+import { Button } from '../../components/Button';
+import { CartIcon } from '../../components/icons';
 import { QuantityPicker } from '../../components/QuantityPicker';
 import { showToast } from '../../components/toast';
+import { cx } from '../../lib/cx';
 import { MAX_QUANTITY, addToCart, useCart } from '../cart/cart';
 
 type Product = components['schemas']['Product'];
 
-export function AddToCartButton({ product }: { readonly product: Product }) {
+interface AddToCartButtonProps {
+  readonly product: Product;
+  /** 'lg' on the product page, 'md' inside a catalogue card. */
+  readonly size?: 'md' | 'lg';
+}
+
+export function AddToCartButton({ product, size = 'md' }: AddToCartButtonProps) {
   const cart = useCart();
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -20,48 +29,51 @@ export function AddToCartButton({ product }: { readonly product: Product }) {
   const selected = Math.min(quantity, max);
 
   return (
-    <div className="add-to-cart-box">
-      <QuantityPicker
-        label={`الكمية المطلوبة من ${product.name}`}
-        value={selected}
-        max={max}
-        disabled={outOfStock || lineFull}
-        onChange={setQuantity}
-      />{' '}
-      <button
-        type="button"
-        className="add-to-cart"
-        disabled={outOfStock || lineFull}
-        onClick={() => {
-          const count = addToCart(
-            {
-              productId: product.id,
-              name: product.name,
-              unitPriceMinor: product.price.amount_minor,
-            },
-            selected,
-          );
-          if (count === 0) {
-            showToast('لا يمكن إضافة المزيد إلى السلة.', 'error');
-            return;
-          }
-          setQuantity(1);
-          setAdded(true);
-          showToast(`تمت إضافة ${String(count)} إلى السلة`);
-        }}
-      >
-        أضف إلى السلة
-      </button>
+    <div className={cx('buy-box', size === 'lg' && 'buy-box-lg')}>
+      <div className="buy-row">
+        <QuantityPicker
+          label={`الكمية المطلوبة من ${product.name}`}
+          value={selected}
+          max={max}
+          size={size}
+          disabled={outOfStock || lineFull}
+          onChange={setQuantity}
+        />
+        <Button
+          size={size}
+          className="buy-button"
+          icon={<CartIcon />}
+          disabled={outOfStock || lineFull}
+          onClick={() => {
+            const count = addToCart(
+              {
+                productId: product.id,
+                name: product.name,
+                unitPriceMinor: product.price.amount_minor,
+              },
+              selected,
+            );
+            if (count === 0) {
+              showToast('لا يمكن إضافة المزيد إلى السلة.', 'error');
+              return;
+            }
+            setQuantity(1);
+            setAdded(true);
+            showToast(`تمت إضافة ${String(count)} إلى السلة`);
+          }}
+        >
+          أضف إلى السلة
+        </Button>
+      </div>
       {lineFull && (
-        <p className="muted">
+        <p className="muted small">
           وصلت إلى الحد الأقصى ({MAX_QUANTITY}) لهذا المنتج في السلة (الموجود الآن: {inCart}).
         </p>
       )}
       {added && !lineFull && (
-        <span role="status" className="success">
-          {' '}
+        <p role="status" className="inline-success">
           تمت الإضافة إلى السلة.
-        </span>
+        </p>
       )}
     </div>
   );

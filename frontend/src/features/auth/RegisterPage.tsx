@@ -1,7 +1,9 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { type SyntheticEvent, useState } from 'react';
 import { ProblemError } from '../../api/problem';
+import { Button } from '../../components/Button';
 import { ErrorNotice } from '../../components/ErrorNotice';
+import { UserIcon } from '../../components/icons';
 import { Field, type FieldErrors, serverFieldErrors, validate } from '../../components/forms';
 import { useRegister } from './mutations';
 import { registerSchema } from './schemas';
@@ -57,32 +59,38 @@ export function RegisterPage() {
   }
 
   return (
-    <section>
-      <h1>إنشاء حساب</h1>
-      {showNotice && <ErrorNotice error={register.error} />}
-      <form onSubmit={onSubmit} noValidate>
-        {fields.map((field) => (
-          <Field key={field.name} label={field.label} errors={errors[field.name]}>
-            {(props) => (
-              <input
-                {...props}
-                type={field.type}
-                autoComplete={field.autoComplete}
-                value={values[field.name]}
-                onChange={(e) => {
-                  setValues((v) => ({ ...v, [field.name]: e.target.value }));
-                }}
-              />
-            )}
-          </Field>
-        ))}
-        <button type="submit" disabled={register.isPending}>
-          {register.isPending ? 'جارٍ الإنشاء…' : 'إنشاء الحساب'}
-        </button>
-      </form>
-      <p>
-        لديك حساب؟ <Link to="/login">تسجيل الدخول</Link>
-      </p>
+    <section className="auth-page">
+      <div className="card auth-card">
+        <span className="auth-icon" aria-hidden="true">
+          <UserIcon />
+        </span>
+        <h1>إنشاء حساب</h1>
+        <p className="auth-sub">أنشئ حساب زبون لإنشاء الطلبات ومتابعة حالتها.</p>
+        {showNotice && <ErrorNotice error={register.error} />}
+        <form onSubmit={onSubmit} noValidate className="form-stack">
+          {fields.map((field) => (
+            <Field key={field.name} label={field.label} errors={errors[field.name]}>
+              {(props) => (
+                <input
+                  {...props}
+                  type={field.type}
+                  autoComplete={field.autoComplete}
+                  value={values[field.name]}
+                  onChange={(e) => {
+                    setValues((v) => ({ ...v, [field.name]: e.target.value }));
+                  }}
+                />
+              )}
+            </Field>
+          ))}
+          <Button type="submit" size="lg" block disabled={register.isPending}>
+            {register.isPending ? 'جارٍ الإنشاء…' : 'إنشاء الحساب'}
+          </Button>
+        </form>
+        <p className="auth-foot">
+          لديك حساب؟ <Link to="/login">تسجيل الدخول</Link>
+        </p>
+      </div>
     </section>
   );
 }
