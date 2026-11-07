@@ -8,7 +8,10 @@ flowchart LR
   edge -->|/api/*  FastCGI| api[api<br/>PHP-FPM · Laravel 13]
   edge -->|/storage/* صور| vol[(volume: product-images)]
   edge -->|/docs| swagger[swagger-ui]
-  api --> dbapp[(db-app<br/>PostgreSQL 18)]
+  api -->|writes| dbapp[(db-app<br/>PostgreSQL 18)]
+  api -->|reads| replica[(db-app-replica<br/>hot standby)]
+  dbapp -.->|streaming WAL| replica
+  api -->|cache, rate limits| redis[(redis 8.6)]
   api -->|gRPC + deadline| toxi[toxiproxy<br/>:50051]
   toxi --> inv[inventory<br/>Spring Boot 4.1 · Java 25<br/>gRPC :9090]
   inv --> dbinv[(db-inventory<br/>PostgreSQL 18)]
@@ -26,7 +29,9 @@ flowchart LR
 | `edge` | `nginx:1.30.6-alpine` (stable؛ فرع 1.29 انتهى — ADR-0010) + `infra/nginx/` | `server_tokens off`، `client_max_body_size 3m`، ترويسات أمان للـ SPA |
 | `api` | `backend/api/Dockerfile` (php:8.4-fpm + `ext-grpc` + `ext-pdo_pgsql` + `ext-sodium` + opcache) | `expose_php=Off`؛ healthcheck عبر `php-fpm-healthcheck` أو `/api/v1/health` |
 | `scheduler` | نفس صورة `api` | `php artisan schedule:work` (المصالحة كل دقيقة) |
-| `db-app` | `postgres:18-alpine` | volume مستقل |
+| `db-app` | `postgres:18-alpine` | volume مستقل؛ الأصل (primary) للكتابات منذ المتطلب 3 |
+| `db-app-replica` | `postgres:18.6-alpine3.24` | نسخة قراءة hot standby بالـ streaming replication (ADR-0014)؛ `db-app-roles` (لمرة واحدة) ينشئ دور النسخ |
+| `redis` | `redis:8.6.8-alpine3.23` | مخزن الكاش ومحدِّدات المعدّل (ADR-0013)؛ بلا تخزين دائم ولا منفذ منشور |
 | `inventory` | `backend/inventory/Dockerfile` (multi-stage، JRE 25، مستخدم غير root) | gRPC health + reflection؛ actuator على منفذ داخلي |
 | `db-inventory` | `postgres:18-alpine` | volume مستقل، **لا يصل إليها `api` شبكياً** (شبكة `inventory-net` منفصلة) |
 | `toxiproxy` | `ghcr.io/shopify/toxiproxy` | proxy `inventory` : `0.0.0.0:50051 → inventory:9090` |
@@ -38,7 +43,7 @@ flowchart LR
 | `toolbox` (profile `tools`) | `infra/toolbox/Dockerfile` | `grpcurl` + `psql` + `jq` + `curl` للعرض والتشخيص؛ متصل بالشبكتين (أداة تشخيص فقط، ليست جزءاً من التطبيق) |
 
 **عزل الشبكات (يثبت R2-S2 مادياً):**
-- `app-net`: edge, api, scheduler, db-app, toxiproxy, mailpit, swagger
+- `app-net`: edge, api, scheduler, db-app, db-app-replica, redis, toxiproxy, mailpit, swagger
 - `inventory-net`: toxiproxy, inventory, db-inventory
 - `api` ليس على `inventory-net` ⇒ مستحيل أن يتصل بـ `db-inventory` حتى لو أراد.
 
@@ -136,7 +141,7 @@ sequenceDiagram
 ## 8. الاستعداد للمتطلبات القادمة (قرارات الآن كي لا نهدم لاحقاً)
 | المتطلب | ما نفعله الآن |
 |---|---|
-| 3 التخزين المؤقت | قراءات المنتجات خلف `ProductCatalog`؛ `GetStock` دفعي؛ لا حالة في الذاكرة |
+| 3 التخزين المؤقت | **منفَّذ:** كاش الكتالوج في Redis بلا المخزون (ADR-0013)، ETag/304، فهرس `orders(created_at, id)`، نسخة قراءة مع read-your-writes (ADR-0014) — التقرير: `docs/performance-report.md` |
 | 4 غير متزامن/لحظي | الإشعارات عبر Events + Listeners بـ `afterCommit` (يصبح Queue بتغيير سطر)؛ جدول journal يصلح كـ outbox |
 | 5 التوسع | API عديم الحالة (JWT + refresh في DB)، الصور على volume قابل للاستبدال بـ S3، لا sessions |
 | 6 المراقبة | Request-Id، JSON logs، health endpoints، actuator/Micrometer جاهز في Spring |

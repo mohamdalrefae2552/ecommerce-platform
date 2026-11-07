@@ -1,0 +1,23 @@
+## redis (INFO stats / memory)
+total_commands_processed:18848
+evicted_keys:0
+keyspace_hits:10043
+keyspace_misses:1520
+used_memory_human:2.46M
+## db-app (primary): transactions | rows returned | rows fetched
+195 | 8425 | 6938
+## db-app-replica: transactions | rows returned | rows fetched
+8082 | 4873399 | 322209
+## seq scans per table (primary | replica): relname | seq_scan | seq_tup_read | idx_scan
+primary | cache | 0 | 0 | 0
+primary | order_items | 0 | 0 | 0
+primary | orders | 0 | 0 | 0
+primary | products | 0 | 0 | 9
+primary | users | 31 | 436 | 0
+replica | cache | 0 | 0 | 0
+replica | order_items | 0 | 0 | 18541
+replica | orders | 0 | 0 | 508
+replica | products | 0 | 0 | 0
+replica | users | 1391 | 19222 | 0
+## replication
+db-app-replica | streaming | idle

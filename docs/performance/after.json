@@ -1,0 +1,70 @@
+{
+  "run": "after",
+  "finished_at": "2026-11-07T17:42:32.071Z",
+  "duration": "60s",
+  "customers": 60,
+  "scale": 1,
+  "rates_per_second": {
+    "products_list": 35,
+    "product_details": 30,
+    "categories": 10,
+    "my_orders": 15,
+    "admin_orders": 1.5
+  },
+  "endpoints": [
+    {
+      "endpoint": "products_list",
+      "requests": 2101,
+      "p50": 64.600733,
+      "p95": 283.657815,
+      "p99": 332.867195,
+      "avg": 105.43486974869137,
+      "max": 402.47723,
+      "not_modified_rate": 0.5721085197524988
+    },
+    {
+      "endpoint": "product_details",
+      "requests": 1800,
+      "p50": 68.343592,
+      "p95": 300.15627314999995,
+      "p99": 360.33720187,
+      "avg": 108.9317224516666,
+      "max": 538.788483,
+      "not_modified_rate": 0.058888888888888886
+    },
+    {
+      "endpoint": "categories",
+      "requests": 601,
+      "p50": 51.030143,
+      "p95": 248.438991,
+      "p99": 302.573424,
+      "avg": 85.56747986356072,
+      "max": 341.452089,
+      "not_modified_rate": 0.9833610648918469
+    },
+    {
+      "endpoint": "my_orders",
+      "requests": 901,
+      "p50": 69.104703,
+      "p95": 304.571684,
+      "p99": 354.020658,
+      "avg": 113.51557144173141,
+      "max": 429.189291,
+      "not_modified_rate": 0
+    },
+    {
+      "endpoint": "admin_orders",
+      "requests": 91,
+      "p50": 89.512759,
+      "p95": 358.1956725,
+      "p99": 398.5018993999997,
+      "avg": 148.28849643956042,
+      "max": 449.959151,
+      "not_modified_rate": 0
+    }
+  ],
+  "http_reqs": 5565,
+  "http_req_failed_rate": 0.0005390835579514825,
+  "rate_limited": 0,
+  "dropped_iterations": 0
+}

@@ -1,0 +1,11 @@
+
+=== R3 performance (after-light) ===
+  run: after-light, 60s per scenario, 15 customers, scale 0.25
+  endpoint           p50 ms   p95 ms   p99 ms   avg ms   max ms  304 %   reqs
+  products_list        27.1     36.4     43.9     28.3     56.6   56.3    528
+  product_details      25.7     36.8     43.8     27.1     60.2    5.3    451
+  categories           22.2     29.1     37.1     23.2     39.4   96.7    151
+  my_orders            30.9     42.3     55.8     32.1     69.3    0.0    229
+  admin_orders         47.9     59.0     64.8     47.0     66.4    0.0     24
+  http requests: 1406, failed: 0.00%, 429: 0, dropped iterations (load not offered: no free VU): 0
+  result: PASS
