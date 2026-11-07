@@ -1,5 +1,6 @@
 ### Requests runnable from the VS Code REST Client / JetBrains HTTP Client.
-### The demo scenarios (docs/04 section 8) are added next to this file in P1-QA-01.
+### The interview scenarios are scripted in ../scripts/demo-r1.sh and demo-r2.sh;
+### every endpoint is also in tests/postman.
 @edge = http://localhost:8080
 @api = {{edge}}/api/v1
 

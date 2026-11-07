@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # First-run setup, idempotent (`make bootstrap`):
 #   .env from .env.example → images → APP_KEY → JWT keys → migrations + seeds.
-# Secrets are generated locally and never committed (CLAUDE.md rule 7).
+# Secrets are generated locally and never committed (docs/04-security.md §7).
 set -euo pipefail
 
 compose=(docker compose -p "${PROJECT:?}")

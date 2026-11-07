@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Agent worktrees (docs/07 section 4). Called by `make wt` / `make wt-rm`.
+# Isolated git worktrees, each with its own stack. Called by `make wt` / `make wt-rm`.
 #   wt.sh add     NAME BRANCH [BASE] [MEMBER_NAME MEMBER_EMAIL]   (via env)
 #   wt.sh remove  NAME
 # Worktrees live next to the main checkout: <parent>/<repo>-wt/<NAME>.

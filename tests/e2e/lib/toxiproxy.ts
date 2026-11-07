@@ -6,7 +6,7 @@
  * slow that link with `down()` / `latency()` and always restore it with
  * `resetProxy()` (the `chaos` fixture does this after every test).
  *
- * Every call has an explicit deadline (CLAUDE.md rule 6) so a dead Toxiproxy
+ * Every call has an explicit deadline so a dead Toxiproxy
  * fails the test instead of hanging it.
  */
 import { env } from './env';

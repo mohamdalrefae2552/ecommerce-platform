@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Format a single file. Called by `make fmt-file FILE=<abs path>`, which the
-# PostToolUse hook (.claude/hooks/format-file.sh) runs after every edit.
+# Format a single file. Called by `make fmt-file FILE=<abs path>`, e.g. from an
+# editor's format-on-save integration.
 #
-# Output contract read by the hook:
+# Output contract for the caller:
 #   exit 0                            formatted, or nothing to do
 #   exit 1 + a line "FMT_INVALID: …"  the file itself is invalid
 #   exit 1 without the marker         infrastructure problem (non-blocking)
@@ -20,8 +20,8 @@ root="$(cd "$root" && pwd -P)"
 rel="${abs#"$root"/}"
 compose=(docker compose -p "${PROJECT:?}" --project-directory "$root")
 
-# has_image <compose service>: the service image exists locally (no build/pull
-# inside a 60 s hook).
+# has_image <compose service>: the service image exists locally (never build or
+# pull here: the call must stay fast).
 has_image() { [[ -n "$("${compose[@]}" --profile test --profile tools images -q "$1" 2>/dev/null)" ]] || docker image inspect "${PROJECT}-$1" >/dev/null 2>&1; }
 
 # run_or_invalid <cmd...>: on failure print the FMT_INVALID marker.
@@ -43,7 +43,7 @@ case "$rel" in
     run_or_invalid "${compose[@]}" --profile test run --rm --no-deps -T -v "$root/backend/api:/src" -w /src api-test /app/vendor/bin/pint --quiet "${rel#backend/api/}"
     ;;
   backend/inventory/*.java)
-    # Spotless on a single file costs a Gradle start-up (> hook timeout);
+    # Spotless on a single file costs a full Gradle start-up;
     # `make verify-inventory` runs spotlessCheck on the whole module instead.
     exit 0
     ;;

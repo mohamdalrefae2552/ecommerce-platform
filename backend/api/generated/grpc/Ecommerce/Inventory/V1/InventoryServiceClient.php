@@ -5,8 +5,8 @@
 // =============================================================================
 // Inventory Service — gRPC contract (source of truth)
 // -----------------------------------------------------------------------------
-// Owner: Lead only. Every change goes through the `contract-first` skill:
-//   buf lint → buf breaking (against main) → make gen → notify both teams.
+// Contract-first (ADR-0002): every change goes through
+//   buf lint → buf breaking (against main) → make gen → review by both teams.
 //
 // Semantics binding on both client (Laravel) and server (Spring Boot).
 // Full details: docs/03-grpc-contract.md and docs/05-inventory-consistency.md.

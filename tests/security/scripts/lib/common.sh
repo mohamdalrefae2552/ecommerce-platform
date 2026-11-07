@@ -17,7 +17,7 @@ fi
 EDGE_URL="${EDGE_URL:-http://localhost:8080}"
 EDGE_URL="${EDGE_URL%/}"
 API="$EDGE_URL/api/v1"
-# Explicit deadline for every request (CLAUDE.md rule 6).
+# Explicit deadline for every request.
 CURL_MAX_TIME="${CURL_MAX_TIME:-15}"
 
 _failures=0

@@ -30,7 +30,7 @@ export default defineConfig([
       },
     },
     rules: {
-      // `any` and silencing the compiler are banned outright (react-engineer rules).
+      // `any` and silencing the compiler are banned outright (project rules).
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/ban-ts-comment': [
         'error',

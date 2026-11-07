@@ -45,7 +45,7 @@ return [
 
     /*
     | Redis (requirement 3): the cache store (catalogue cache, rate limiters).
-    | Every call has a deadline (CLAUDE.md rule 6): connect 1 s, read 1 s.
+    | Every call has a deadline: connect 1 s, read 1 s.
     */
     'redis' => [
         'client' => env('REDIS_CLIENT', 'phpredis'),

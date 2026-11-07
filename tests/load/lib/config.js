@@ -6,7 +6,7 @@ const raw = (__ENV.EDGE_URL || 'http://localhost').trim();
 export const EDGE_URL = raw.replace(/\/+$/, '');
 export const API_URL = `${EDGE_URL}/api/v1`;
 
-// Explicit client-side deadline for every request (CLAUDE.md rule 6): longer
+// Explicit client-side deadline for every request: longer
 // than the API's own inventory budget (3s) so the API's answer is what we see.
 export const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || '10s';
 

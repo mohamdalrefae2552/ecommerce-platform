@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 // Catalogue of the Products module. No quantity column: stock lives only in
-// the inventory service (CLAUDE.md rule 5).
+// the inventory service (ADR-0004, docs/01-architecture.md).
 return new class extends Migration
 {
     public function up(): void
