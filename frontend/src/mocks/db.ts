@@ -31,7 +31,7 @@ export const customer: User = {
   created_at: '2026-11-01T17:41:00Z',
 };
 
-export const otherCustomer: User = {
+const otherCustomer: User = {
   id: '01JC3Z8X7Q4M2N5P6R7S8T9V0X',
   name: 'Omar Saleh',
   email: 'omar@example.com',

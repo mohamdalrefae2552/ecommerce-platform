@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { components } from './schema';
 
-export type ProblemCode = components['schemas']['ProblemCode'];
+type ProblemCode = components['schemas']['ProblemCode'];
 
 /**
  * Arabic user message for every problem `code` of the contract
@@ -72,7 +72,7 @@ export const problemSchema = z.object({
 });
 
 export type Problem = z.infer<typeof problemSchema>;
-export type Shortage = NonNullable<Problem['shortages']>[number];
+type Shortage = NonNullable<Problem['shortages']>[number];
 
 export function isProblemContentType(contentType: string | null): boolean {
   if (contentType === null) return false;
@@ -151,7 +151,7 @@ export class NetworkError extends Error {
 }
 
 /** "حاول بعد 5 ثوانٍ" style suffix (Arabic plural rules for seconds). */
-export function retryAfterText(seconds: number): string {
+function retryAfterText(seconds: number): string {
   if (seconds === 1) return 'حاول بعد ثانية واحدة.';
   if (seconds === 2) return 'حاول بعد ثانيتين.';
   if (seconds >= 3 && seconds <= 10) return `حاول بعد ${String(seconds)} ثوانٍ.`;

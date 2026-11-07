@@ -13,7 +13,7 @@ type Token = components['schemas']['Token'];
  * `restoring` until the first silent refresh settles, so guards never decide
  * "logged out" before knowing.
  */
-export type Session =
+type Session =
   | { readonly status: 'restoring' }
   | { readonly status: 'anonymous' }
   | { readonly status: 'authenticated'; readonly user: User; readonly accessToken: string };
@@ -40,7 +40,7 @@ export function getAccessToken(): string | null {
   return session.status === 'authenticated' ? session.accessToken : null;
 }
 
-export function subscribeSession(listener: () => void): () => void {
+function subscribeSession(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);

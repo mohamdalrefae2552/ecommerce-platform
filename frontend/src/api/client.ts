@@ -17,9 +17,9 @@ export const API_PATH = '/api/v1';
  * within ~3 s even when the inventory is down (docs/05), so 10 s only fires
  * when the network or edge itself hangs.
  */
-export const REQUEST_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 10_000;
 
-export interface ApiClientOptions {
+interface ApiClientOptions {
   /** Absolute base URL, e.g. `https://shop.example/api/v1`. */
   readonly baseUrl: string;
   readonly getAccessToken: () => string | null;
@@ -53,7 +53,7 @@ async function isTokenExpired(response: Response): Promise<boolean> {
  * Replaying is safe for any method: the server rejected the request before
  * running it, and the copy keeps the same body and Idempotency-Key.
  */
-export function authMiddleware(
+function authMiddleware(
   readToken: () => string | null,
   createRequestId: () => string,
   refreshAccessToken: (() => Promise<string | null>) | undefined,
@@ -98,7 +98,7 @@ export function authMiddleware(
  * `UnexpectedResponseError`. No response → `NetworkError`; client deadline →
  * `RequestTimeoutError`. Callers therefore only ever see successful `data`.
  */
-export const problemMiddleware: Middleware = {
+const problemMiddleware: Middleware = {
   async onResponse({ response }) {
     if (response.ok) return undefined;
 
@@ -172,7 +172,7 @@ export function createApiClient(options: ApiClientOptions) {
   return client;
 }
 
-export type ApiClient = ReturnType<typeof createApiClient>;
+type ApiClient = ReturnType<typeof createApiClient>;
 
 /**
  * Returns the body of a successful call. Errors never reach here (the
@@ -193,9 +193,7 @@ export function requireData<T>(result: { readonly data?: T; readonly response: R
  * Single-flight refresh: concurrent callers share one `/auth/refresh` call
  * (a second call would re-use a rotated token and revoke the family).
  */
-export function createRefresher(
-  refresh: () => Promise<string | null>,
-): () => Promise<string | null> {
+function createRefresher(refresh: () => Promise<string | null>): () => Promise<string | null> {
   let inFlight: Promise<string | null> | null = null;
   return () => {
     inFlight ??= refresh().finally(() => {

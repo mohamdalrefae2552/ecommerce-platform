@@ -16,7 +16,7 @@ export function useAdjustStock(productId: string) {
   });
 }
 
-export interface NewProduct {
+interface NewProduct {
   readonly name: string;
   readonly description: string;
   readonly priceMinor: number;

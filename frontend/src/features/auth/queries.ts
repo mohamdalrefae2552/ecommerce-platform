@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { api, requireData } from '../../api/client';
 
-export const authKeys = {
+const authKeys = {
   me: ['auth', 'me'] as const,
 };
 

@@ -17,7 +17,7 @@ export function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('ar-SY');
 }
 
-export const stockUnknownText = 'الكمية غير متاحة حالياً';
+const stockUnknownText = 'الكمية غير متاحة حالياً';
 
 export function stockText(stock: Stock): string {
   if (stock.status === 'unknown' || stock.available === null) return stockUnknownText;

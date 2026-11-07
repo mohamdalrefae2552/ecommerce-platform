@@ -20,7 +20,7 @@ import { useLogout } from '../features/auth/mutations';
 import { clearCart, useCart } from '../features/cart/cart';
 import { HealthStatus } from '../features/health/HealthStatus';
 
-export interface RouterContext {
+interface RouterContext {
   readonly queryClient: QueryClient;
 }
 

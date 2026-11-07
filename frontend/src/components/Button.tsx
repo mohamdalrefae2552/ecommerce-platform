@@ -1,8 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cx } from '../lib/cx';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonSize = 'sm' | 'md' | 'lg';
 
 /** Class list of a button, also used to style router links as buttons. */
 export function buttonClass(

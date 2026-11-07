@@ -8,7 +8,7 @@ export const catalogKeys = {
   product: (id: string) => ['products', 'detail', id] as const,
 };
 
-export const PRODUCTS_PER_PAGE = 12;
+const PRODUCTS_PER_PAGE = 12;
 
 export const categoriesQuery = queryOptions({
   queryKey: catalogKeys.categories,

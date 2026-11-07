@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 /** Cart lives in memory only (local state); the server re-checks prices and stock. */
-export interface CartLine {
+interface CartLine {
   readonly productId: string;
   readonly name: string;
   readonly unitPriceMinor: number;
@@ -10,7 +10,7 @@ export interface CartLine {
 
 /** Mirrors the contract: an order line carries 1..100 units. */
 export const MAX_QUANTITY = 100;
-export const MAX_LINES = 20;
+const MAX_LINES = 20;
 
 let lines: readonly CartLine[] = [];
 const listeners = new Set<() => void>();

@@ -33,7 +33,7 @@ export const healthOk: Schemas['Health'] = { status: 'ok', checks: { db: 'ok', i
 type Auth = { user: User } | { response: Response };
 
 /** Bearer check as the API does it: missing/unknown → UNAUTHENTICATED, expired → TOKEN_EXPIRED. */
-export function authenticate(request: Request, instance: string): Auth {
+function authenticate(request: Request, instance: string): Auth {
   const header = request.headers.get('Authorization');
   const token = header?.startsWith('Bearer ') === true ? header.slice('Bearer '.length) : null;
   if (token !== null && db.expiredTokens.has(token)) {
@@ -47,7 +47,7 @@ export function authenticate(request: Request, instance: string): Auth {
   return { user: toPublicUser(user) };
 }
 
-export function validationFailed(instance: string, errors: Record<string, string[]>) {
+function validationFailed(instance: string, errors: Record<string, string[]>) {
   return problemResponse(
     problem('VALIDATION_FAILED', 422, instance, { detail: 'البيانات المرسلة غير صالحة.', errors }),
   );

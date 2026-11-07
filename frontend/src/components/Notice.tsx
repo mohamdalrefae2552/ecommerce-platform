@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cx } from '../lib/cx';
 import { AlertIcon, CheckIcon, InfoIcon, WarningIcon } from './icons';
 
-export type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
+type NoticeTone = 'info' | 'success' | 'warning' | 'danger';
 
 const toneIcon = {
   info: InfoIcon,
