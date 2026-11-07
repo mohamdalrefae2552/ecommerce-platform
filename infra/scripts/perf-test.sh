@@ -16,11 +16,11 @@ mkdir -p "$out_dir" .cache/perf
 sampler=""
 
 run_k6() {
-  # .cache/perf (git-ignored): access tokens shared by the two perf-compare runs.
+  # .cache/perf (git-ignored): access tokens given by perf-compare (TOKENS_IN).
   # shellcheck disable=SC2086 # COMPOSE is a command line with options.
   $COMPOSE --profile tools run --rm -v "$PWD/$out_dir:/work/out" -v "$PWD/.cache/perf:/work/tokens" \
     -e OUT="$OUT" -e DURATION="${DURATION:-60s}" -e SCALE="${SCALE:-1}" -e CUSTOMERS="${CUSTOMERS:-}" \
-    -e TOKENS_IN="${TOKENS_IN:-}" -e TOKENS_OUT="${TOKENS_OUT:-}" \
+    -e TOKENS_IN="${TOKENS_IN:-}" \
     k6 run --quiet /work/tests/load/perf.js 2>&1 && echo 0 >"$status_file" || echo $? >"$status_file"
 }
 

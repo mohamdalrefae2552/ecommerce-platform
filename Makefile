@@ -156,7 +156,7 @@ perf-test: ## R3-7: p50/p95/p99 per endpoint + CPU: make perf-test OUT=baseline|
 	@PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" OUT="$(or $(OUT),perf)" DURATION="$(DURATION)" SCALE="$(SCALE)" CUSTOMERS="$(CUSTOMERS)" \
 	  bash $(SCRIPTS)/perf-test.sh
 
-perf-compare: ## R3 live demo: same load with R3 off then on, one table: make perf-compare [DURATION=45s]
+perf-compare: ## R3 live demo: R3 off then on at the perf-test load, one table: make perf-compare [DURATION=40s]
 	$(need_docker)
 	$(call need,tests/load/perf.js,R3)
 	@PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" HOST_URL="http://localhost:$(EDGE_PORT)" DURATION="$(DURATION)" bash $(SCRIPTS)/perf-compare.sh

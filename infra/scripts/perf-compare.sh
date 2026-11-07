@@ -7,8 +7,11 @@
 #           dropped (app:perf-index off).
 #   after:  the defaults (all on), index recreated, catalogue cache warmed.
 # The optimised mode is ALWAYS restored at the end, even on failure or
-# Ctrl+C (trap). Both runs share one set of logins (tokens in .cache/perf),
-# so the per-IP login limit is paid once.
+# Ctrl+C (trap). Same load as `make perf-test` (~91.5 req/s, 60 customers),
+# where the old system saturates. The 61 access tokens come from
+# `php artisan app:perf-tokens` (no HTTP logins: 60 logins would take three
+# minutes behind the per-IP login limit, which stays as it is); they are kept
+# in the git-ignored .cache/perf and deleted at the end.
 #   PROJECT=... COMPOSE="docker compose ..." HOST_URL=... perf-compare.sh
 set -euo pipefail
 
@@ -17,11 +20,10 @@ set -euo pipefail
 : "${PROJECT:?}" "${COMPOSE:?}" "${HOST_URL:?}"
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 out_dir="docs/performance"
-duration="${DURATION:-45s}"
-# 19 customers + the admin = 20 logins, exactly the per-IP limit of a minute.
-# 91.5 x 0.35 = 32 req/s, i.e. 1.7 req/s per customer (limit: 2/s = 120/min).
-customers="${CUSTOMERS:-19}"
-scale="${SCALE:-0.35}"
+duration="${DURATION:-40s}"
+# 91.5 req/s over 60 customers = 1.5 req/s each (per-user limit: 2/s).
+customers="${CUSTOMERS:-60}"
+scale="${SCALE:-1}"
 tokens=".cache/perf/tokens.json"
 mode=optimised
 
@@ -78,19 +80,21 @@ trap restore EXIT
 
 run() {
   PROJECT="$PROJECT" COMPOSE="$COMPOSE" OUT="$1" DURATION="$duration" SCALE="$scale" CUSTOMERS="$customers" \
-    TOKENS_IN="${2:-}" TOKENS_OUT="${3:-}" bash "$here/perf-test.sh" | grep -E 'R3 performance|endpoint|_list|_details|categories|_orders|http requests|result:|level=error|failed thresholds|  - '
+    TOKENS_IN=/work/tokens/tokens.json bash "$here/perf-test.sh" | grep -E 'R3 performance|endpoint|_list|_details|categories|_orders|http requests|result:|level=error|failed thresholds|  - '
 }
 
 step "BEFORE — requirement 3 switched off (no cache, no ETag, no replica, rate limits in Postgres, no orders index)"
 switch before
-run live-before "" /work/tokens/tokens.json
+mkdir -p .cache/perf
+artisan app:perf-tokens "$customers" | tr -d '\r' >"$tokens"
+run live-before
 
 step "AFTER — optimised (cache, ETag, replica, Redis, index)"
 switch after
 # Warm-up: the first reads fill the catalogue cache, as in normal operation.
 for page in 1 2 3 4 5 6 7 8 9 10; do curl -s -o /dev/null -m 5 "$HOST_URL/api/v1/products?page=$page"; done
 curl -s -o /dev/null -m 5 "$HOST_URL/api/v1/categories"
-run live-after /work/tokens/tokens.json ""
+run live-after
 
 step "RESULT — same load ($customers customers, $(awk "BEGIN{printf \"%.0f\", 91.5*$scale}") req/s, $duration each), latency in ms"
 jq -r -s '
