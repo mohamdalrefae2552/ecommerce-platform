@@ -1,5 +1,5 @@
 # =============================================================================
-# Single entry point for every task (CLAUDE.md section 5). Tools run inside
+# Single entry point for every task (README.md, docs/07). Tools run inside
 # containers; the host only needs Docker, GNU make, bash, git (and jq/curl for
 # the interview demo scripts).
 #
@@ -33,11 +33,6 @@ BREAKING_BASE ?= $(shell git rev-parse --verify -q origin/main >/dev/null && ech
 
 # Dev/test credentials for the host-side proof scripts (D-04, D-05).
 DEMO_ENV = DEV_ADMIN_EMAIL="$(call env_value,DEV_ADMIN_EMAIL)" DEV_ADMIN_PASSWORD="$(call env_value,DEV_ADMIN_PASSWORD)"   SEED_CUSTOMER_COUNT="$(call env_value,SEED_CUSTOMER_COUNT)" SEED_CUSTOMER_PASSWORD="$(call env_value,SEED_CUSTOMER_PASSWORD)"
-
-# need <path> <task id>: fail clearly when a component does not exist yet.
-define need
-	@test -e "$(1)" || { echo "✗ '$(1)' does not exist yet — it is created by task $(2)." >&2; exit 1; }
-endef
 
 define need_docker
 	@command -v docker >/dev/null 2>&1 || { echo "✗ docker is not installed or not on PATH (see README → Prerequisites)." >&2; exit 1; }
@@ -97,7 +92,6 @@ lint-contracts: ## buf lint + buf breaking (vs main) + Redocly lint (zero warnin
 
 gen: ## Generate PHP gRPC stubs (from proto) and TS types (from OpenAPI)
 	$(need_docker)
-	$(call need,backend/api,P0-API-01)
 	$(TOOLS) run --rm --no-deps -w /work/contracts/proto buf buf generate
 	@if [ -f frontend/package.json ]; then \
 	  $(TESTS) run --rm --no-deps web-test sh -c "pnpm install --frozen-lockfile && pnpm run gen:api"; \
@@ -109,40 +103,33 @@ verify: lint-contracts verify-api verify-inventory verify-web verify-e2e ## Merg
 
 verify-api: ## Laravel: Pint --test + Larastan max + Pest (real Postgres)
 	$(need_docker)
-	$(call need,backend/api/composer.json,P0-API-01)
 	$(TESTS) run --rm --build api-test sh -c "composer lint:check && composer analyse && composer test"
 
 test-api: ## Run part of the Laravel suite: make test-api F=Orders
 	$(need_docker)
-	$(call need,backend/api/composer.json,P0-API-01)
 	$(TESTS) run --rm --build api-test composer test -- $(if $(F),--filter=$(F))
 
 verify-inventory: ## Spring: Spotless + ErrorProne + tests (Testcontainers) + JaCoCo
 	$(need_docker)
-	$(call need,backend/inventory/build.gradle.kts,P0-INV-01)
 	$(TESTS) run --rm inventory-test ./gradlew --no-daemon check
 
 test-inventory: ## Run one inventory test class: make test-inventory T=ReservationConcurrencyIT
 	$(need_docker)
-	$(call need,backend/inventory/build.gradle.kts,P0-INV-01)
 	@test -n "$(T)" || { echo "usage: make test-inventory T=<TestClass>" >&2; exit 1; }
 	$(TESTS) run --rm inventory-test ./gradlew --no-daemon test --tests '*$(T)'
 
 verify-web: ## React: ESLint + tsc + Vitest + build
 	$(need_docker)
-	$(call need,frontend/package.json,P0-WEB-01)
 	$(TESTS) run --rm --no-deps web-test sh -c "pnpm install --frozen-lockfile && pnpm run verify"
 
 verify-e2e: ## Playwright E2E against the running stack (run `make up` first)
 	$(need_docker)
-	$(call need,tests/e2e/package.json,P0-QA-01)
 	$(TESTS) run --rm e2e
 
 # ---------------------------------------------------------------- proofs --
 .PHONY: race-test perf-seed perf-test perf-compare replica-check postman demo-r1 demo-r2
 race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [N=50]
 	$(need_docker)
-	$(call need,tests/load/race.js,P2-QA-01)
 	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run --quiet /work/tests/load/race.js
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/race-verify.sh
 
@@ -152,13 +139,11 @@ perf-seed: ## R3-1: bulk fake history: make perf-seed [ORDERS=200000 PRODUCTS=20
 
 perf-test: ## R3-7: p50/p95/p99 per endpoint + CPU: make perf-test OUT=baseline|after [DURATION=60s SCALE=1 CUSTOMERS=60]
 	$(need_docker)
-	$(call need,tests/load/perf.js,R3)
 	@PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" OUT="$(or $(OUT),perf)" DURATION="$(DURATION)" SCALE="$(SCALE)" CUSTOMERS="$(CUSTOMERS)" \
 	  bash $(SCRIPTS)/perf-test.sh
 
 perf-compare: ## R3 live demo: R3 off then on at the perf-test load, one table: make perf-compare [DURATION=40s]
 	$(need_docker)
-	$(call need,tests/load/perf.js,R3)
 	@PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" HOST_URL="http://localhost:$(EDGE_PORT)" DURATION="$(DURATION)" bash $(SCRIPTS)/perf-compare.sh
 
 replica-check: ## R3-4: replica streams, read-your-writes on the stack, replication lag
@@ -172,11 +157,9 @@ postman: ## Run every REST request of tests/postman with newman against the runn
 	  --env-var baseUrl=http://localhost/api/v1
 
 demo-r1: ## Interview demo, requirement 1 (IDOR, 403, rate limit, JWT, headers)
-	$(call need,tests/security/scripts/demo-r1.sh,P1-QA-01)
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r1.sh
 
 demo-r2: ## Interview demo, requirement 2 (race, inventory down/slow)
-	$(call need,tests/security/scripts/demo-r2.sh,P2-QA-02)
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r2.sh
 
 # ----------------------------------------------------------------- chaos --
@@ -199,14 +182,14 @@ chaos-status: ## Show the inventory proxy and its toxics
 	$(need_docker)
 	@PROJECT="$(PROJECT)" bash $(SCRIPTS)/chaos.sh status
 
-# ------------------------------------------------------------- worktrees --
+# ------------------------------------------------------- worktrees, format --
 .PHONY: wt wt-rm fmt-file
-wt: ## Agent worktree: make wt NAME=api BRANCH=feat/x [BASE=main MEMBER_NAME=.. MEMBER_EMAIL=..]
+wt: ## Isolated git worktree with its own stack: make wt NAME=api BRANCH=feat/x [BASE=main MEMBER_NAME=.. MEMBER_EMAIL=..]
 	@NAME="$(NAME)" BRANCH="$(BRANCH)" BASE="$(or $(BASE),main)" \
 	  MEMBER_NAME="$(MEMBER_NAME)" MEMBER_EMAIL="$(MEMBER_EMAIL)" bash $(SCRIPTS)/wt.sh add
 
-wt-rm: ## Remove an agent worktree and its stack: make wt-rm NAME=api
+wt-rm: ## Remove a worktree and its stack: make wt-rm NAME=api
 	@NAME="$(NAME)" bash $(SCRIPTS)/wt.sh remove
 
-fmt-file: ## Format one file (used by the PostToolUse hook): make fmt-file FILE=<abs path>
+fmt-file: ## Format one file (editor format-on-save): make fmt-file FILE=<abs path>
 	@PROJECT="$(PROJECT)" bash $(SCRIPTS)/fmt-file.sh "$(FILE)"
