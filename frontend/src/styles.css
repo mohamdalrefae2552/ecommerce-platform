@@ -227,6 +227,23 @@ a:hover {
   white-space: nowrap;
 }
 
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-half);
+  color: var(--success-700);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.live-badge::before {
+  content: '';
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .inline-success {
   display: inline-flex;
   align-items: center;

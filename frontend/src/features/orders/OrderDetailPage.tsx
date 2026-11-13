@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { ProblemError } from '../../api/problem';
@@ -12,8 +12,10 @@ import { ListSkeleton } from '../../components/Skeleton';
 import { StatusPill, statusTone } from '../../components/StatusPill';
 import { showToast } from '../../components/toast';
 import { formatDate, formatMoney } from '../../lib/format';
+import { useLiveEvents } from '../../realtime/useLiveEvents';
 import { StatusChanger } from './StatusChanger';
-import { orderQuery } from './queries';
+import { ORDER_STATUS_CHANGED, orderChannel, statusChangedSchema } from './live';
+import { orderKeys, orderQuery } from './queries';
 import { statusLabels } from './status';
 
 function BackLink() {
@@ -30,6 +32,23 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
   const { data: order, error, isPending } = useQuery(orderQuery(orderId));
   const isAdmin = session.status === 'authenticated' && session.user.role === 'admin';
   const [copied, setCopied] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Requirement 4: the customer sees a status change without refreshing.
+  // Only the owner may follow an order, so an admin does not subscribe here
+  // (the admin dashboard has its own channel).
+  const isCustomer = session.status === 'authenticated' && session.user.role === 'customer';
+  useLiveEvents(
+    isCustomer ? orderChannel(orderId) : null,
+    [ORDER_STATUS_CHANGED],
+    (_event, data) => {
+      void queryClient.invalidateQueries({ queryKey: orderKeys.all });
+      const update = statusChangedSchema.safeParse(data);
+      if (update.success) {
+        showToast(`تغيّرت حالة طلبك إلى: ${statusLabels[update.data.to]}`);
+      }
+    },
+  );
 
   if (isPending) return <ListSkeleton label="جارٍ تحميل الطلب…" rows={3} />;
   if (error !== null) {
@@ -57,6 +76,7 @@ export function OrderDetailPage({ orderId }: { readonly orderId: string }) {
         </div>
         <div className="order-head-actions">
           <StatusPill status={order.status} />
+          {isCustomer && <span className="live-badge">تحديث مباشر</span>}
           <Button
             variant="secondary"
             size="sm"
