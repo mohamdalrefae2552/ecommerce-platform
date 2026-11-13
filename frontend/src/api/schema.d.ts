@@ -393,6 +393,40 @@ export interface paths {
         patch: operations["markNotificationRead"];
         trace?: never;
     };
+    "/broadcasting/auth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Authorise a private WebSocket channel subscription
+         * @description Live updates (requirement 4) use WebSockets (Pusher protocol, served
+         *     at `/app/{key}` on the same origin). Before subscribing to a private
+         *     channel the browser calls this endpoint; the server checks the JWT
+         *     (identity) and the channel rule (authorisation) and only then signs
+         *     the subscription. The WebSocket server refuses a subscription without
+         *     a valid signature.
+         *
+         *     Channels:
+         *     - `private-orders.{orderId}` — only the customer who owns the order.
+         *       Event `order.status_changed`: `{order_id, from, to, changed_at}`.
+         *     - `private-admin.orders` — only an admin. Events `order.placed`
+         *       (an `OrderSummary`) and `order.status_changed`.
+         *
+         *     The response is the Pusher protocol body (`{auth}`), not the usual
+         *     `{data}` envelope: the WebSocket client library reads it as is.
+         */
+        post: operations["authorizeChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -417,6 +451,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ChannelAuthRequest: {
+            /**
+             * @description Id the WebSocket server gave this connection.
+             * @example 271035419.403417282
+             */
+            socket_id: string;
+            /**
+             * @description The private channel to subscribe to.
+             * @example private-admin.orders
+             */
+            channel_name: string;
+        };
+        ChannelAuth: {
+            /**
+             * @description `<app key>:<HMAC-SHA256 signature>` for this socket and channel.
+             * @example ecommerce-web:6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c
+             */
+            auth: string;
+        };
         /**
          * @description ULID (26 characters, Crockford base32, upper case).
          * @example 01JC3Z8X7Q4M2N5P6R7S8T9V0W
@@ -2189,6 +2242,47 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    authorizeChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "socket_id": "271035419.403417282",
+                 *       "channel_name": "private-orders.01JC41D4E5F6G7H8J9KAMBNCPQ"
+                 *     }
+                 */
+                "application/json": components["schemas"]["ChannelAuthRequest"];
+            };
+        };
+        responses: {
+            /** @description The subscription is allowed and signed. */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "auth": "ecommerce-web:6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c"
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ChannelAuth"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["ValidationFailed"];
             429: components["responses"]["RateLimited"];
             500: components["responses"]["InternalError"];
         };

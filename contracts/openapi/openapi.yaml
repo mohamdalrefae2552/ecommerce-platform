@@ -33,6 +33,8 @@ tags:
     description: Order creation, viewing and status tracking.
   - name: Notifications
     description: In-app notifications sent to the current user.
+  - name: Realtime
+    description: Authorisation of private WebSocket channels (live order updates).
   - name: Health
     description: Liveness of the API and its dependencies.
 security:
@@ -917,6 +919,59 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /broadcasting/auth:
+    post:
+      tags: [Realtime]
+      operationId: authorizeChannel
+      summary: Authorise a private WebSocket channel subscription
+      description: |
+        Live updates (requirement 4) use WebSockets (Pusher protocol, served
+        at `/app/{key}` on the same origin). Before subscribing to a private
+        channel the browser calls this endpoint; the server checks the JWT
+        (identity) and the channel rule (authorisation) and only then signs
+        the subscription. The WebSocket server refuses a subscription without
+        a valid signature.
+
+        Channels:
+        - `private-orders.{orderId}` — only the customer who owns the order.
+          Event `order.status_changed`: `{order_id, from, to, changed_at}`.
+        - `private-admin.orders` — only an admin. Events `order.placed`
+          (an `OrderSummary`) and `order.status_changed`.
+
+        The response is the Pusher protocol body (`{auth}`), not the usual
+        `{data}` envelope: the WebSocket client library reads it as is.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelAuthRequest'
+            example:
+              socket_id: '271035419.403417282'
+              channel_name: private-orders.01JC41D4E5F6G7H8J9KAMBNCPQ
+      responses:
+        '200':
+          description: The subscription is allowed and signed.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/XRequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelAuth'
+              example:
+                auth: ecommerce-web:6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /health:
     get:
       tags: [Health]
@@ -1570,6 +1625,30 @@ components:
           updated_at: '2026-11-01T18:10:00Z'
 
   schemas:
+    ChannelAuthRequest:
+      type: object
+      additionalProperties: false
+      required: [socket_id, channel_name]
+      properties:
+        socket_id:
+          type: string
+          pattern: '^\d+\.\d+$'
+          description: Id the WebSocket server gave this connection.
+          examples: ['271035419.403417282']
+        channel_name:
+          type: string
+          pattern: '^private-[A-Za-z0-9_.\-]{1,150}$'
+          description: The private channel to subscribe to.
+          examples: [private-admin.orders]
+    ChannelAuth:
+      type: object
+      additionalProperties: false
+      required: [auth]
+      properties:
+        auth:
+          type: string
+          description: '`<app key>:<HMAC-SHA256 signature>` for this socket and channel.'
+          examples: ['ecommerce-web:6f1b891e1d4927d62740276c540fb490e47689e19e102c49e8da849794882f8c']
     Ulid:
       type: string
       description: ULID (26 characters, Crockford base32, upper case).
