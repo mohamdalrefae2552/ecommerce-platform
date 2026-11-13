@@ -55,7 +55,7 @@ backend/api/
 │   │   ├── Users/          Http/{Controllers,Requests,Resources} · Models · Actions · Policies · Contracts · Database/{Migrations,Factories,Seeders} · Providers/UsersServiceProvider.php · routes.php
 │   │   ├── Products/       … + Contracts/ProductCatalog.php (واجهة عامة تعيد DTOs)
 │   │   ├── Orders/         … + Domain/OrderStatus.php (state machine) · Contracts/OrderQueries.php
-│   │   └── Notifications/  Listeners · Notifications · Http …
+│   │   └── Notifications/  Messaging (عامل طابور البريد) · Mail · Http …
 │   └── Shared/
 │       ├── Http/           ProblemDetails, ExceptionRenderer, Middleware/{SecurityHeaders, RequestId, ForceJson}
 │       ├── Auth/           JwtGuard, TokenIssuer, RefreshTokenService, Role enum
@@ -67,7 +67,7 @@ backend/api/
 ### قواعد الحدود (تُفرض بـ `tests/Arch/ModuleBoundariesTest.php`)
 - `App\Modules\X` لا يستخدم `App\Modules\Y\Models\*` ولا `Y\Database\*` ولا `Y\Actions\*` — فقط `App\Modules\Y\Contracts\*` و DTOs.
 - لا FK بين جداول وحدتين مختلفتين؛ المرجع عمود ULID عادي (مثال: `order_items.product_id`) مع **نسخة لقطة** (snapshot) من الاسم والسعر وقت الطلب.
-- الأحداث بين الوحدات عبر Laravel Events معرّفة في `Contracts/Events` للوحدة المُصدِرة (مثال: `Orders\Contracts\Events\OrderPlaced`) وتُطلق `afterCommit`.
+- الأحداث بين الوحدات رسائل RabbitMQ (المتطلب 4): أنواعها معرّفة في `Contracts/Messages` للوحدة المُصدِرة (`Orders\Contracts\Messages\OrderMessages`)، تُكتب في الـ outbox داخل معاملة الطلب وتُنشر بعد الـ commit (ADR-0015، `docs/10-async-realtime.md`).
 - `Shared` لا يعتمد على أي `Modules\*`.
 
 ### نمط الكود داخل الوحدة
@@ -142,6 +142,6 @@ sequenceDiagram
 | المتطلب | ما نفعله الآن |
 |---|---|
 | 3 التخزين المؤقت | **منفَّذ:** كاش الكتالوج في Redis بلا المخزون (ADR-0013)، ETag/304، فهرس `orders(created_at, id)`، نسخة قراءة مع read-your-writes (ADR-0014) — التقرير: `docs/performance-report.md` |
-| 4 غير متزامن/لحظي | الإشعارات عبر Events + Listeners بـ `afterCommit` (يصبح Queue بتغيير سطر)؛ جدول journal يصلح كـ outbox |
+| 4 غير متزامن/لحظي | **منفَّذ:** أحداث الطلبات عبر outbox ← RabbitMQ ← عاملان مستقلان (بريد، بث) مع retry و DLQ (ADR-0015)؛ WebSocket عبر Reverb بقناتين خاصتين موقّعتين (ADR-0016) — `docs/10-async-realtime.md` |
 | 5 التوسع | API عديم الحالة (JWT + refresh في DB)، الصور على volume قابل للاستبدال بـ S3، لا sessions |
 | 6 المراقبة | Request-Id، JSON logs، health endpoints، actuator/Micrometer جاهز في Spring |

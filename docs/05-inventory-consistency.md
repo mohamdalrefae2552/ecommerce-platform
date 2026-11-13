@@ -91,7 +91,7 @@ inventory_reservation_attempts(
 | ↳ فشل المعاملة (أي استثناء) | `ReleaseStock(ORDER_PERSISTENCE_FAILED)` ⇒ attempt=`RELEASED` (أو `RELEASE_PENDING` إن فشل الإفراج) | 500 `INTERNAL_ERROR` |
 | INSUFFICIENT_STOCK | attempt=`REJECTED` | 409 + shortages |
 | Timeout / Unavailable / Aborted | `ReleaseStock(RESERVE_OUTCOME_UNKNOWN)` best-effort ⇒ `RELEASED` أو `RELEASE_PENDING` | 503 |
-7. `OrderPlaced` event بعد الـ commit ⇒ إشعار.
+7. حدث `order.placed` يُكتب في الـ outbox داخل نفس المعاملة ويُنشر إلى RabbitMQ بعد الـ commit ⇒ الإشعار والبريد والتحديث اللحظي عند العمّال (المتطلب 4، `docs/10-async-realtime.md`).
 
 ### إلغاء الطلب (admin → `cancelled`)
 داخل معاملة تغيير الحالة: سجّل الانتقال، وبعد الـ commit نادِ `ReleaseStock(ORDER_CANCELLED)` بمعرّف الحجز المرتبط؛ عند الفشل ⇒ attempt=`RELEASE_PENDING` (المصالحة تكمل). الإلغاء لا يُرفض بسبب توقف المستودع.

@@ -23,6 +23,9 @@ backend/api/storage/keys/*
 **/test-results/
 **/blob-report/
 tests/load/results/
+# Eclipse/VS Code Java output and the outputs of every `make perf-compare` run
+backend/inventory/bin/
+docs/performance/live-*
 
 # --- logs ---
 *.log

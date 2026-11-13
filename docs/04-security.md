@@ -82,7 +82,7 @@ CSP مناسبة لـ SPA: `default-src 'self'; img-src 'self' data:; style-src 
 - الحاويات تعمل كـ non-root؛ `read_only: true` حيث أمكن.
 
 ## 8. سيناريوهات العرض (Demo)
-`tests/security/http/` + `make demo-r1`:
+`tests/postman/` + `make demo-r1`:
 1. تسجيل زبونين A و B، A ينشئ طلباً، B يطلب `GET /orders/{idA}` ⇒ 404.
 2. B يرسل `PATCH /orders/{idA}/status` ⇒ 403؛ ثم A نفسه ⇒ 403.
 3. 6 محاولات دخول خاطئة ⇒ السادسة 429 مع `Retry-After`.

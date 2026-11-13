@@ -139,5 +139,5 @@ pending ──► confirmed ──► shipped ──► delivered
 ## 5. التوثيق القابل للتجربة (R1-A4)
 - `swagger` على `http://localhost:8080/docs` يقرأ `openapi.yaml` مع **Try it out** يعمل (نفس الأصل ⇒ لا CORS).
 - كل عملية في العقد لها: `operationId`، أمثلة طلب/استجابة، كل الأخطاء الممكنة مرجعةً إلى `components/responses/*` التي تشير إلى schema `Problem`.
-- مجموعة طلبات جاهزة للعرض: `tests/security/http/*.http` (مستخدمة في demo).
+- مجموعة طلبات جاهزة للعرض: `tests/postman/ecommerce-api.postman_collection.json` (`make postman`).
 - **اختبار مطابقة العقد:** كل اختبار Feature في Laravel يتحقق تلقائياً أن الاستجابة تطابق `openapi.yaml` (helper `assertMatchesContract()`؛ المكتبة تُحدَّد في ADR-0010).

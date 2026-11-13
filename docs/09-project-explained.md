@@ -89,7 +89,7 @@ Makefile              ← كل الأوامر (make up, make demo-r1, ...)
 
 بالإضافة إلى `app/Shared/` (الأشياء المشتركة: الأخطاء، الترويسات، JWT، بوابة المخزون).
 
-**قاعدة الحدود:** وحدة لا تستورد Models وحدة أخرى ولا تقرأ جداولها. مثلاً `Orders` تعرف المنتج عبر الواجهة `Products/Contracts/ProductCatalog.php` فقط، والإشعارات تسمع **أحداثاً** (`Orders/Contracts/Events/OrderStatusChanged.php`). هذا **مفروض باختبار آلي** (`backend/api/tests/Arch/`): لو كسر أحدنا القاعدة يفشل الاختبار.
+**قاعدة الحدود:** وحدة لا تستورد Models وحدة أخرى ولا تقرأ جداولها. مثلاً `Orders` تعرف المنتج عبر الواجهة `Products/Contracts/ProductCatalog.php` فقط، والإشعارات تستهلك **رسائل** من RabbitMQ أنواعها في `Orders/Contracts/Messages/OrderMessages.php`. هذا **مفروض باختبار آلي** (`backend/api/tests/Arch/`): لو كسر أحدنا القاعدة يفشل الاختبار.
 
 ### 5.2 شكل الـ API
 - كل المسارات تحت `/api/v1/...` (الإصدار في المسار).
