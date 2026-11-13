@@ -9,10 +9,12 @@ use App\Shared\Auth\JwtKeyStore;
 use App\Shared\Auth\TokenIssuer;
 use App\Shared\Auth\TokenVerifier;
 use App\Shared\Inventory\InventoryGateway;
+use App\Shared\Messaging\MessagePublisher;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Testing\TestResponse;
 use Studio\Gesso\Laravel\ValidatesOpenApiSchema;
 use Tests\Support\FakeInventoryGateway;
+use Tests\Support\FakeMessagePublisher;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -42,6 +44,8 @@ abstract class TestCase extends BaseTestCase
 
         // Feature tests never reach the network: an in-memory inventory.
         $this->app->instance(InventoryGateway::class, new FakeInventoryGateway);
+        // ...and an in-memory broker instead of RabbitMQ.
+        $this->app->instance(MessagePublisher::class, new FakeMessagePublisher);
     }
 
     /**

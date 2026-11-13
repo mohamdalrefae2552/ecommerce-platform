@@ -1,6 +1,7 @@
 # =============================================================================
 # Runtime stack (docs/01 section 2). Only `edge` publishes a port.
-#   app-net        edge, api, scheduler, db-app, toxiproxy, mailpit, swagger
+#   app-net        edge, api, scheduler, db-app, toxiproxy, mailpit, swagger,
+#                  rabbitmq, worker-mail, worker-realtime, reverb
 #   inventory-net  toxiproxy, inventory, db-inventory   (internal, no egress)
 # `api` is NOT on inventory-net, so it physically cannot reach db-inventory
 # (R2-S2); its only way to the inventory is gRPC through toxiproxy.
@@ -45,9 +46,26 @@ x-api-env: &api-env
   HTTP_ETAG_ENABLED: ${HTTP_ETAG_ENABLED:-true}
   SESSION_DRIVER: ${SESSION_DRIVER:-array}
   QUEUE_CONNECTION: ${QUEUE_CONNECTION:-sync}
+  # Requirement 4 (ADR-0015): order events go to RabbitMQ through the outbox;
+  # the workers consume them. Reverb is the WebSocket server (ADR-0016).
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_USER: ${RABBITMQ_USER:-app}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env (make bootstrap adds it)}
+  MAIL_QUEUE_MAX_ATTEMPTS: ${MAIL_QUEUE_MAX_ATTEMPTS:-5}
+  MAIL_QUEUE_RETRY_DELAY_MS: ${MAIL_QUEUE_RETRY_DELAY_MS:-10000}
+  BROADCAST_CONNECTION: reverb
+  REVERB_APP_ID: ${REVERB_APP_ID:-ecommerce}
+  REVERB_APP_KEY: ${REVERB_APP_KEY:-ecommerce-web}
+  REVERB_APP_SECRET: ${REVERB_APP_SECRET:?set REVERB_APP_SECRET in .env (make bootstrap adds it)}
+  REVERB_HOST: reverb
+  REVERB_PORT: 8080
+  REVERB_SCHEME: http
   MAIL_MAILER: ${MAIL_MAILER:-smtp}
   MAIL_HOST: ${MAIL_HOST:-mailpit}
   MAIL_PORT: ${MAIL_PORT:-1025}
+  # Empty for Mailpit; set both for a real provider (Gmail SMTP: docs/10 section 6).
+  MAIL_USERNAME: ${MAIL_USERNAME:-}
+  MAIL_PASSWORD: ${MAIL_PASSWORD:-}
   MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-no-reply@ecommerce.local}
   MAIL_FROM_NAME: ${APP_NAME:-E-commerce Platform}
   PHP_FPM_MAX_CHILDREN: ${PHP_FPM_MAX_CHILDREN:-16}
@@ -158,6 +176,102 @@ services:
       timeout: 3s
       retries: 5
       start_period: 15s
+    networks: [app-net]
+
+  # Requirement 4: the two independent workers. Same image as the api, one
+  # queue each; stopping one never loses a message (manual ack, durable
+  # queues) and never affects the api.
+  worker-mail:
+    build:
+      context: backend/api
+      target: runtime
+    restart: unless-stopped
+    command: ["php", "artisan", "messaging:consume", "notifications.mail"]
+    stop_grace_period: 20s
+    environment: &worker-env
+      <<: *api-env
+      # Workers decide on fresh state: they read the primary.
+      DB_READ_HOST: db-app
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      db-app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'messaging:consume notifications.mail' >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks: [app-net]
+
+  worker-realtime:
+    build:
+      context: backend/api
+      target: runtime
+    restart: unless-stopped
+    command: ["php", "artisan", "messaging:consume", "realtime.orders"]
+    stop_grace_period: 20s
+    environment: *worker-env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      reverb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'messaging:consume realtime.orders' >/dev/null"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks: [app-net]
+
+  # WebSocket server (Pusher protocol). Browsers reach it through edge
+  # (/app/...); its publishing API (/apps/...) is only reachable inside
+  # app-net and needs the app secret.
+  reverb:
+    build:
+      context: backend/api
+      target: runtime
+    restart: unless-stopped
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    environment:
+      <<: *api-env
+      # Only pages served from this host may open a socket.
+      REVERB_ALLOWED_ORIGINS: ${REVERB_ALLOWED_ORIGINS:-localhost}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8080"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    networks: [app-net]
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    # The data directory is named after the host name: keep it stable.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-app}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env (make bootstrap adds it)}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
     networks: [app-net]
 
   db-app:
@@ -480,6 +594,7 @@ volumes:
   db-inventory-data: {}
   product-images: {}
   jwt-keys: {}
+  rabbitmq-data: {}
   gradle-cache: {}
   inventory-build: {}
   web-node-modules: {}

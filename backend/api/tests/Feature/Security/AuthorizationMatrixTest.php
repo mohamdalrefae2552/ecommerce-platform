@@ -48,6 +48,7 @@ function authorizationMatrix(): array
         'show order (PROOF-R1-1)' => ['GET', '/api/v1/orders/{order}', [], ['guest' => 401, 'owner' => 200, 'other' => 404, 'admin' => 200]],
         'change status (PROOF-R1-2)' => ['PATCH', '/api/v1/orders/{order}/status', ['status' => 'confirmed'], ['guest' => 401, 'owner' => 403, 'other' => 403, 'admin' => 200]],
         'notifications' => ['GET', '/api/v1/notifications', [], ['guest' => 401, 'owner' => 200, 'other' => 200, 'admin' => 200]],
+        'follow an order live (requirement 4)' => ['POST', '/api/v1/broadcasting/auth', ['socket_id' => '271035419.403417282', 'channel_name' => 'private-orders.{order}'], ['guest' => 401, 'owner' => 200, 'other' => 403, 'admin' => 403]],
         'read notification' => ['PATCH', '/api/v1/notifications/{notification}/read', [], ['guest' => 401, 'owner' => 200, 'other' => 404, 'admin' => 404]],
     ];
 }

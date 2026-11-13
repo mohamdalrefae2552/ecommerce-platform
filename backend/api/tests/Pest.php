@@ -5,9 +5,11 @@ declare(strict_types=1);
 use App\Shared\Auth\AuthUser;
 use App\Shared\Auth\TokenIssuer;
 use App\Shared\Inventory\InventoryGateway;
+use App\Shared\Messaging\MessagePublisher;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Tests\Support\ContractAssertions;
 use Tests\Support\FakeInventoryGateway;
+use Tests\Support\FakeMessagePublisher;
 use Tests\TestCase;
 
 pest()->extend(TestCase::class)
@@ -28,6 +30,20 @@ function inventory(): FakeInventoryGateway
     }
 
     return $gateway;
+}
+
+/**
+ * The in-memory message broker bound by Tests\TestCase.
+ */
+function broker(): FakeMessagePublisher
+{
+    $publisher = app(MessagePublisher::class);
+
+    if (! $publisher instanceof FakeMessagePublisher) {
+        throw new LogicException('The fake message broker is not bound.');
+    }
+
+    return $publisher;
 }
 
 /**

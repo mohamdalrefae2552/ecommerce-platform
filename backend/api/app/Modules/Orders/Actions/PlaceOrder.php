@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Actions;
 
-use App\Modules\Orders\Contracts\Events\OrderPlaced;
+use App\Modules\Orders\Contracts\Messages\OrderMessages;
 use App\Modules\Orders\Domain\OrderStatus;
 use App\Modules\Orders\Domain\ReservationState;
+use App\Modules\Orders\Messaging\OrderEventPayloads;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Orders\Models\ReservationAttempt;
 use App\Modules\Products\Contracts\CatalogProduct;
@@ -18,6 +19,7 @@ use App\Shared\Inventory\Exceptions\InsufficientStock;
 use App\Shared\Inventory\InventoryGateway;
 use App\Shared\Inventory\ReleaseReason;
 use App\Shared\Inventory\ReservationLine;
+use App\Shared\Messaging\Outbox\Outbox;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -47,13 +49,16 @@ use Throwable;
  *    the units are released (ORDER_PERSISTENCE_FAILED) and the error is
  *    rethrown (500). A failed release leaves RELEASE_PENDING for the
  *    reconciler.
- * 6. OrderPlaced is dispatched after the commit.
+ * 6. The `order.placed` event is written to the outbox in the same
+ *    transaction and published to RabbitMQ after the commit (requirement 4):
+ *    the e-mail and the live updates never delay the answer.
  */
 final readonly class PlaceOrder
 {
     public function __construct(
         private ProductCatalog $catalog,
         private InventoryGateway $inventory,
+        private Outbox $outbox,
     ) {}
 
     /**
@@ -230,7 +235,7 @@ final readonly class PlaceOrder
             $attempt->order_id = $order->id;
             $attempt->moveTo(ReservationState::Confirmed);
 
-            event(new OrderPlaced($order->id, $order->user_id, $order->status->value));
+            $this->outbox->record(OrderMessages::PLACED, OrderEventPayloads::placed($order, count($lines)));
 
             return $order;
         });

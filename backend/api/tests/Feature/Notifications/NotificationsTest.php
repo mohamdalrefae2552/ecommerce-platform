@@ -3,22 +3,46 @@
 declare(strict_types=1);
 
 use App\Modules\Notifications\Mail\OrderUpdateMail;
+use App\Modules\Notifications\Messaging\SendOrderNotification;
 use App\Modules\Notifications\Models\UserNotification;
-use App\Modules\Orders\Contracts\Events\OrderPlaced;
 use App\Modules\Orders\Models\Order;
 use App\Modules\Products\Models\Product;
+use App\Modules\Users\Contracts\UserDirectory;
 use App\Modules\Users\Models\User;
-use Illuminate\Support\Facades\DB;
+use App\Shared\Messaging\InvalidMessage;
+use App\Shared\Messaging\Message;
+use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Facades\Mail;
+use Mockery\MockInterface;
 
 use function Pest\Laravel\getJson;
 use function Pest\Laravel\patchJson;
 use function Pest\Laravel\postJson;
 
+/*
+| Requirement 4: notifications are produced by the `notifications.mail`
+| worker from order events. Here the in-memory broker delivers each event
+| to the worker's handler at once.
+*/
+
 beforeEach(function (): void {
     Mail::fake();
     inventory()->defaultAvailable = 100;
+    broker()->deliver = true;
 });
+
+function orderPlacedMessage(User $customer, string $id = '01JC43A1B2C3D4E5F6G7H8J9KA'): Message
+{
+    return new Message($id, 'order.placed', [
+        'order_id' => '01JC41D4E5F6G7H8J9KAMBNCPQ',
+        'user_id' => $customer->id,
+        'status' => 'pending',
+        'total_minor' => 1000,
+        'currency' => 'SYP',
+        'item_count' => 1,
+        'created_at' => '2026-11-13T10:00:00Z',
+    ], '2026-11-13T10:00:00Z');
+}
 
 it('notifies the customer once in the database and once by e-mail when an order is placed', function (): void {
     $customer = User::factory()->create();
@@ -46,22 +70,55 @@ it('notifies the customer of a status change', function (): void {
 
     patchJson('/api/v1/orders/'.$order->id.'/status', ['status' => 'confirmed'], bearer(User::factory()->admin()->create()))->assertOk();
 
-    expect(UserNotification::query()->where('user_id', $customer->id)->sole()->type)->toBe('order.status_changed');
+    $notification = UserNotification::query()->where('user_id', $customer->id)->sole();
+    expect($notification->type)->toBe('order.status_changed')
+        ->and($notification->order_status)->toBe('confirmed')
+        ->and($notification->mailed_at)->not->toBeNull();
     Mail::assertSent(OrderUpdateMail::class, 1);
 });
 
-it('sends nothing when the transaction rolls back (afterCommit)', function (): void {
-    try {
-        DB::transaction(function (): void {
-            event(new OrderPlaced('01JC41D4E5F6G7H8J9KAMBNCPQ', '01JC3Z8X7Q4M2N5P6R7S8T9V0W', 'pending'));
+it('handles a message delivered twice only once (idempotent worker)', function (): void {
+    $customer = User::factory()->create();
+    $handler = app(SendOrderNotification::class);
+    $message = orderPlacedMessage($customer);
 
-            throw new RuntimeException('rollback');
-        });
-    } catch (RuntimeException) {
-    }
+    $handler->handle($message);
+    $handler->handle($message);
+
+    expect(UserNotification::query()->count())->toBe(1);
+    Mail::assertSent(OrderUpdateMail::class, 1);
+});
+
+it('keeps the e-mail owed when the mail server fails, and sends it on the next attempt', function (): void {
+    $customer = User::factory()->create();
+    $message = orderPlacedMessage($customer);
+
+    /** @var Mailer&MockInterface $failing */
+    $failing = Mockery::mock(Mailer::class);
+    $failing->shouldReceive('to')->andThrow(new RuntimeException('smtp down'));
+
+    expect(fn () => (new SendOrderNotification(app(UserDirectory::class), $failing))->handle($message))
+        ->toThrow(RuntimeException::class, 'smtp down');
+
+    // The in-app notification exists, the e-mail is still owed.
+    expect(UserNotification::query()->sole()->mailed_at)->toBeNull();
+    Mail::assertNothingSent();
+
+    app(SendOrderNotification::class)->handle($message);
+
+    expect(UserNotification::query()->sole()->mailed_at)->not->toBeNull();
+    Mail::assertSent(OrderUpdateMail::class, 1);
+});
+
+it('refuses a message it can never handle, so the worker parks it instead of retrying', function (): void {
+    $handler = app(SendOrderNotification::class);
+
+    expect(fn () => $handler->handle(new Message('01JC43A1B2C3D4E5F6G7H8J9KB', 'order.exploded', [], '2026-11-13T10:00:00Z')))
+        ->toThrow(InvalidMessage::class);
+    expect(fn () => $handler->handle(new Message('01JC43A1B2C3D4E5F6G7H8J9KC', 'order.placed', ['status' => 'pending'], '2026-11-13T10:00:00Z')))
+        ->toThrow(InvalidMessage::class);
 
     expect(UserNotification::query()->count())->toBe(0);
-    Mail::assertNothingSent();
 });
 
 it('marks a notification read, idempotently, and hides other users\' notifications', function (): void {

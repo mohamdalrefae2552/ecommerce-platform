@@ -9,11 +9,15 @@ use App\Modules\Users\Providers\UsersServiceProvider;
 use App\Shared\Auth\AuthServiceProvider;
 use App\Shared\Database\DatabaseServiceProvider;
 use App\Shared\Inventory\InventoryServiceProvider;
+use App\Shared\Messaging\MessagingServiceProvider;
+use App\Shared\Realtime\RealtimeServiceProvider;
 
 return [
     DatabaseServiceProvider::class,
     AuthServiceProvider::class,
     InventoryServiceProvider::class,
+    MessagingServiceProvider::class,
+    RealtimeServiceProvider::class,
     UsersServiceProvider::class,
     ProductsServiceProvider::class,
     OrdersServiceProvider::class,

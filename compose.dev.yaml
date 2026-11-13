@@ -5,6 +5,12 @@ services:
     ports:
       - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
 
+  # RabbitMQ management UI (queues, retry and dead-letter queues) for the
+  # requirement 4 demo, on localhost only.
+  rabbitmq:
+    ports:
+      - "127.0.0.1:${RABBITMQ_UI_PORT:-15672}:15672"
+
   # gRPC access to the inventory for manual testing (Postman, grpcurl) on
   # localhost only. It goes through toxiproxy, so chaos-down / chaos-latency
   # apply to it too; db-inventory itself stays unreachable.

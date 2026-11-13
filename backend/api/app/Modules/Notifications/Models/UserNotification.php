@@ -14,6 +14,8 @@ use Illuminate\Support\Carbon;
  * @property string $type order.placed | order.status_changed
  * @property string $order_id
  * @property string $order_status
+ * @property string|null $message_id id of the order event that caused it (unique)
+ * @property Carbon|null $mailed_at when the e-mail was handed to the mail server
  * @property Carbon|null $read_at
  * @property Carbon $created_at
  */
@@ -32,14 +34,14 @@ final class UserNotification extends Model
     /**
      * @var list<string>
      */
-    protected $fillable = ['user_id', 'type', 'order_id', 'order_status'];
+    protected $fillable = ['user_id', 'type', 'order_id', 'order_status', 'message_id'];
 
     /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
-        return ['read_at' => 'datetime'];
+        return ['read_at' => 'datetime', 'mailed_at' => 'datetime'];
     }
 
     /**

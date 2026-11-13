@@ -37,6 +37,10 @@ RUN install-php-extensions pdo_pgsql intl gd opcache
 # layers above stay cached.
 RUN install-php-extensions redis-6.2.0
 
+# Requirement 4: sockets for the RabbitMQ client (php-amqplib), pcntl so the
+# queue workers and Reverb stop cleanly on SIGTERM.
+RUN install-php-extensions sockets pcntl
+
 # fcgi provides cgi-fcgi for the php-fpm-healthcheck script.
 RUN apk add --no-cache fcgi
 

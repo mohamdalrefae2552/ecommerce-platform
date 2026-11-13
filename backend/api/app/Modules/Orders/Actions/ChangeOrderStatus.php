@@ -4,22 +4,27 @@ declare(strict_types=1);
 
 namespace App\Modules\Orders\Actions;
 
-use App\Modules\Orders\Contracts\Events\OrderStatusChanged;
+use App\Modules\Orders\Contracts\Messages\OrderMessages;
 use App\Modules\Orders\Domain\OrderStatus;
+use App\Modules\Orders\Messaging\OrderEventPayloads;
 use App\Modules\Orders\Models\Order;
 use App\Shared\Auth\AuthUser;
 use App\Shared\Http\Problems\ProblemCode;
 use App\Shared\Http\Problems\ProblemException;
+use App\Shared\Messaging\Outbox\Outbox;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Moves an order to a new status (admin only, checked by OrderPolicy).
  * The row is locked so two concurrent changes cannot both pass the state
- * machine check; every change is written to order_status_history.
+ * machine check; every change is written to order_status_history, and the
+ * `order.status_changed` event to the outbox in the same transaction.
  */
 final readonly class ChangeOrderStatus
 {
+    public function __construct(private Outbox $outbox) {}
+
     public function handle(string $orderId, OrderStatus $next, ?string $note, AuthUser $actor): Order
     {
         return DB::transaction(function () use ($orderId, $next, $note, $actor): Order {
@@ -45,7 +50,7 @@ final readonly class ChangeOrderStatus
                 'at' => Carbon::now(),
             ]);
 
-            event(new OrderStatusChanged($order->id, $order->user_id, $current->value, $next->value));
+            $this->outbox->record(OrderMessages::STATUS_CHANGED, OrderEventPayloads::statusChanged($order, $current));
 
             return $order;
         });
