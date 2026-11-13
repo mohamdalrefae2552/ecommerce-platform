@@ -7,8 +7,7 @@ Black-box tests written from the contract (`contracts/`) and the requirements
 |---|---|---|
 | `e2e/` | Playwright 1.64.1 (TypeScript) | `make up && make verify-e2e` |
 | `load/` | k6 2.3.0 | `make race-test` (P2-QA-01); skeleton: `docker compose --profile tools run --rm k6 run /work/tests/load/smoke.js` |
-| `security/http/` | `.http` files (REST Client) | open in the IDE |
-| `security/scripts/` | bash + curl + jq | `make demo-r1`, `make demo-r2` |
+| `security/scripts/` | bash + curl + jq (+ a Node WebSocket probe) | `make demo-r1`, `make demo-r2`, `make demo-r4` |
 
 ## e2e layout
 - `playwright.config.ts` — targets `EDGE_URL`; one worker (rate limits are per IP, chaos specs share the inventory link); no retries.

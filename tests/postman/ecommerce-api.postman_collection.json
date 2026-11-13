@@ -1065,6 +1065,190 @@
           }
         }
       ]
+    },
+    {
+      "name": "6 - Realtime (WebSocket channel permission)",
+      "description": "Requirement 4: before the browser subscribes to a private WebSocket channel it asks the API to sign the subscription. Run folder 4 first (it sets new_order_id, an order of Customer 1).",
+      "item": [
+        {
+          "name": "Owner: follow own order channel -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"271035419.403417282\", \"channel_name\": \"private-orders.{{new_order_id}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        },
+        {
+          "name": "Other customer: follow that order channel -> 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer2_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"271035419.403417282\", \"channel_name\": \"private-orders.{{new_order_id}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        },
+        {
+          "name": "Admin: follow a customer order channel -> 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"271035419.403417282\", \"channel_name\": \"private-orders.{{new_order_id}}\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        },
+        {
+          "name": "Admin: admin dashboard channel -> 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"271035419.403417282\", \"channel_name\": \"private-admin.orders\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        },
+        {
+          "name": "Customer: admin dashboard channel -> 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"271035419.403417282\", \"channel_name\": \"private-admin.orders\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        },
+        {
+          "name": "No token: admin dashboard channel -> 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"271035419.403417282\", \"channel_name\": \"private-admin.orders\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        },
+        {
+          "name": "Admin: invalid socket id -> 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"socket_id\": \"abc\", \"channel_name\": \"private-admin.orders\" }",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/broadcasting/auth"
+          }
+        }
+      ]
     }
   ],
   "event": [

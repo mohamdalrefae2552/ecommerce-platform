@@ -3,8 +3,7 @@
 # containers; the host only needs Docker, GNU make, bash, git (and jq/curl for
 # the interview demo scripts).
 #
-# Works from the main checkout and from any `make wt` worktree: the compose
-# project name comes from the local .env, so stacks never collide.
+# The compose project name comes from the local .env.
 # =============================================================================
 SHELL := bash
 .SHELLFLAGS := -eu -o pipefail -c
@@ -127,7 +126,7 @@ verify-e2e: ## Playwright E2E against the running stack (run `make up` first)
 	$(TESTS) run --rm e2e
 
 # ---------------------------------------------------------------- proofs --
-.PHONY: race-test perf-seed perf-test perf-compare replica-check postman demo-r1 demo-r2
+.PHONY: race-test perf-seed perf-test perf-compare replica-check postman demo-r1 demo-r2 demo-r4
 race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [N=50]
 	$(need_docker)
 	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run --quiet /work/tests/load/race.js
@@ -162,6 +161,13 @@ demo-r1: ## Interview demo, requirement 1 (IDOR, 403, rate limit, JWT, headers)
 demo-r2: ## Interview demo, requirement 2 (race, inventory down/slow)
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" bash tests/security/scripts/demo-r2.sh
 
+demo-r4: ## Interview demo, requirement 4 (worker stop/start, retry + DLQ, live updates, channel permissions)
+	$(need_docker)
+	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" \
+	  RABBITMQ_USER="$(call env_value,RABBITMQ_USER)" RABBITMQ_PASSWORD="$(call env_value,RABBITMQ_PASSWORD)" \
+	  RABBITMQ_UI_PORT="$(call env_value,RABBITMQ_UI_PORT)" REVERB_APP_KEY="$(call env_value,REVERB_APP_KEY)" \
+	  bash tests/security/scripts/demo-r4.sh
+
 # ----------------------------------------------------------------- chaos --
 # Toxiproxy sits between api/scheduler and inventory (docs/01 section 1).
 .PHONY: chaos-down chaos-latency chaos-reset chaos-status
@@ -182,14 +188,7 @@ chaos-status: ## Show the inventory proxy and its toxics
 	$(need_docker)
 	@PROJECT="$(PROJECT)" bash $(SCRIPTS)/chaos.sh status
 
-# ------------------------------------------------------- worktrees, format --
-.PHONY: wt wt-rm fmt-file
-wt: ## Isolated git worktree with its own stack: make wt NAME=api BRANCH=feat/x [BASE=main MEMBER_NAME=.. MEMBER_EMAIL=..]
-	@NAME="$(NAME)" BRANCH="$(BRANCH)" BASE="$(or $(BASE),main)" \
-	  MEMBER_NAME="$(MEMBER_NAME)" MEMBER_EMAIL="$(MEMBER_EMAIL)" bash $(SCRIPTS)/wt.sh add
-
-wt-rm: ## Remove a worktree and its stack: make wt-rm NAME=api
-	@NAME="$(NAME)" bash $(SCRIPTS)/wt.sh remove
-
+# ---------------------------------------------------------------- format --
+.PHONY: fmt-file
 fmt-file: ## Format one file (editor format-on-save): make fmt-file FILE=<abs path>
 	@PROJECT="$(PROJECT)" bash $(SCRIPTS)/fmt-file.sh "$(FILE)"
