@@ -43,7 +43,7 @@ help: ## List every target
 	  /^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # ----------------------------------------------------------------- stack --
-.PHONY: up down ps logs restart shell-api bootstrap
+.PHONY: up down ps logs restart shell-api bootstrap mail-setup
 up: ## Build and start the stack, wait until every service is healthy
 	$(need_docker)
 	$(COMPOSE) up -d --build --wait --wait-timeout 180
@@ -95,6 +95,9 @@ gen: ## Generate PHP gRPC stubs (from proto) and TS types (from OpenAPI)
 	@if [ -f frontend/package.json ]; then \
 	  $(TESTS) run --rm --no-deps web-test sh -c "pnpm install --frozen-lockfile && pnpm run gen:api"; \
 	else echo "• TS types skipped: frontend/ is created by P0-WEB-01"; fi
+
+mail-setup: ## Real mail through Gmail or another SMTP service (asks for the credentials); RESET=1 = back to Mailpit
+	@RESET="$(RESET)" bash $(SCRIPTS)/mail-setup.sh
 
 # ---------------------------------------------------------------- verify --
 .PHONY: verify verify-api verify-inventory verify-web verify-e2e test-api test-inventory
