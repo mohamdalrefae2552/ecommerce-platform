@@ -25,6 +25,11 @@ return [
             'client_options' => [
                 'connect_timeout' => 2,
                 'timeout' => 5,
+                // Requirement 5: the worker is a long-lived process and cURL
+                // keeps resolved addresses for 60 s. When Reverb instances are
+                // replaced (new IPs) it kept calling the old ones and every
+                // live update failed for a minute; 5 s follows Docker's DNS.
+                'curl' => [CURLOPT_DNS_CACHE_TIMEOUT => 5],
             ],
         ],
     ],

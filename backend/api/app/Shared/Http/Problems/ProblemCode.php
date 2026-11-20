@@ -28,6 +28,7 @@ enum ProblemCode: string
     case InternalError = 'INTERNAL_ERROR';
     case InventoryUnavailable = 'INVENTORY_UNAVAILABLE';
     case InventoryTimeout = 'INVENTORY_TIMEOUT';
+    case ServiceUnavailable = 'SERVICE_UNAVAILABLE';
 
     private const string TYPE_BASE = 'https://ecommerce.local/problems/';
 
@@ -45,7 +46,7 @@ enum ProblemCode: string
             self::ValidationFailed, self::IdempotencyKeyReused => 422,
             self::RateLimited => 429,
             self::InternalError => 500,
-            self::InventoryUnavailable, self::InventoryTimeout => 503,
+            self::InventoryUnavailable, self::InventoryTimeout, self::ServiceUnavailable => 503,
         };
     }
 
@@ -75,6 +76,7 @@ enum ProblemCode: string
             self::InternalError => 'Internal server error',
             self::InventoryUnavailable => 'Inventory unavailable',
             self::InventoryTimeout => 'Inventory timeout',
+            self::ServiceUnavailable => 'Service unavailable',
         };
     }
 
@@ -99,6 +101,7 @@ enum ProblemCode: string
             self::InternalError => 'حدث خطأ غير متوقع، حاول لاحقاً.',
             self::InventoryUnavailable => 'خدمة المخزون غير متاحة حالياً، حاول بعد قليل.',
             self::InventoryTimeout => 'خدمة المخزون لم تستجب في الوقت المحدد، حاول بعد قليل.',
+            self::ServiceUnavailable => 'الخدمة في صيانة مؤقتة، حاول بعد قليل.',
         };
     }
 }

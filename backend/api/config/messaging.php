@@ -37,8 +37,10 @@ return [
         'realtime.orders' => [
             'bindings' => ['order.*'],
             'handler' => BroadcastOrderUpdate::class,
-            'max_attempts' => 3,
-            'retry_delay_ms' => 2000,
+            // 5 tries over ~20 s: long enough to outlive a WebSocket server
+            // being replaced, short enough for an update to stay "live".
+            'max_attempts' => 5,
+            'retry_delay_ms' => 4000,
         ],
     ],
 

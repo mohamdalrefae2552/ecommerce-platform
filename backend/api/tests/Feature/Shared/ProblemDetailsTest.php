@@ -106,6 +106,19 @@ it('answers a tripped rate limiter with 429, Retry-After and retry_after', funct
     expect($response->json('retry_after'))->toBe((int) $response->headers->get('Retry-After'));
 });
 
+it('answers maintenance mode with 503 SERVICE_UNAVAILABLE and Retry-After (requirement 5)', function (): void {
+    app()->maintenanceMode()->activate(['retry' => 60]);
+
+    try {
+        $response = assertProblem(getJson('/api/v1/categories'), ProblemCode::ServiceUnavailable)
+            ->assertHeader('Retry-After', '60');
+
+        expect($response->json('retry_after'))->toBe(60);
+    } finally {
+        app()->maintenanceMode()->deactivate();
+    }
+});
+
 it('answers a malformed JSON body with 400 MALFORMED_REQUEST', function (): void {
     assertProblem(
         call('POST', '/api/v1/__test/echo', server: ['CONTENT_TYPE' => 'application/json'], content: '{"broken":'),

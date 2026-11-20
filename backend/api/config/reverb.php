@@ -14,9 +14,23 @@ return [
             'hostname' => env('REVERB_HOST'),
             'options' => ['tls' => []],
             'max_request_size' => 10_000,
-            // One Reverb instance; horizontal scaling (Redis pub/sub between
-            // instances) belongs to requirement 5.
-            'scaling' => ['enabled' => false],
+            // Requirement 5: several Reverb instances. A browser is connected
+            // to ONE of them, and worker-realtime publishes to ANY of them; with
+            // scaling every instance relays what it receives through Redis
+            // pub/sub, so each subscriber gets every event.
+            'scaling' => [
+                'enabled' => (bool) env('REVERB_SCALING_ENABLED', true),
+                'channel' => 'reverb',
+                'server' => [
+                    'url' => null,
+                    'host' => env('REDIS_HOST', 'redis'),
+                    'port' => env('REDIS_PORT', '6379'),
+                    'username' => null,
+                    'password' => env('REDIS_PASSWORD'),
+                    'database' => '0',
+                    'timeout' => 60,
+                ],
+            ],
             'pulse_ingest_interval' => 15,
             'telescope_ingest_interval' => 15,
         ],

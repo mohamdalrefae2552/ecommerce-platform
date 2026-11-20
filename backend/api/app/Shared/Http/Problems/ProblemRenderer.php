@@ -55,6 +55,8 @@ final class ProblemRenderer
             413 => ProblemCode::PayloadTooLarge,
             415 => ProblemCode::UnsupportedMediaType,
             429 => ProblemCode::RateLimited,
+            // Maintenance mode (`php artisan down`), on every replica at once.
+            503 => ProblemCode::ServiceUnavailable,
             default => ProblemCode::InternalError,
         };
 
@@ -76,6 +78,13 @@ final class ProblemRenderer
                 ['retry_after' => $retryAfter],
                 $headers,
             );
+        }
+
+        if ($code === ProblemCode::ServiceUnavailable && isset($headers['Retry-After'])) {
+            $retryAfter = max(1, (int) $headers['Retry-After']);
+            $headers['Retry-After'] = (string) $retryAfter;
+
+            return ProblemResponse::make($request, $code, extensions: ['retry_after' => $retryAfter], headers: $headers);
         }
 
         return ProblemResponse::make($request, $code, headers: $headers);
