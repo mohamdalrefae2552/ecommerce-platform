@@ -143,5 +143,5 @@ sequenceDiagram
 |---|---|
 | 3 التخزين المؤقت | **منفَّذ:** كاش الكتالوج في Redis بلا المخزون (ADR-0013)، ETag/304، فهرس `orders(created_at, id)`، نسخة قراءة مع read-your-writes (ADR-0014) — التقرير: `docs/performance-report.md` |
 | 4 غير متزامن/لحظي | **منفَّذ:** أحداث الطلبات عبر outbox ← RabbitMQ ← عاملان مستقلان (بريد، بث) مع retry و DLQ (ADR-0015)؛ WebSocket عبر Reverb بقناتين خاصتين موقّعتين (ADR-0016) — `docs/10-async-realtime.md` |
-| 5 التوسع | API عديم الحالة (JWT + refresh في DB)، الصور على volume قابل للاستبدال بـ S3، لا sessions |
+| 5 التوسع | **منفَّذ:** 3 نسخ من الـ API خلف nginx بـ least_conn مع failover، 3 عمّال على طابور واحد، Reverb بنسختين عبر Redis، ولا حالة محلية في النسخة (ADR-0017) — `docs/11-scaling.md` |
 | 6 المراقبة | Request-Id، JSON logs، health endpoints، actuator/Micrometer جاهز في Spring |

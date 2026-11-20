@@ -19,3 +19,4 @@
 | 0014 | نسخة قراءة لـ db-app مع sticky ونافذة read-your-writes | مقبول |
 | 0015 | أحداث الطلبات عبر RabbitMQ: Transactional Outbox، عمّال مستقلون، retry و DLQ | مقبول |
 | 0016 | التحديث اللحظي عبر WebSocket (Reverb) بقنوات خاصة موقّعة | مقبول |
+| 0017 | ثلاث نسخ من الـ API خلف nginx بـ least_conn، وحالة مشتركة لا محلية | مقبول |
