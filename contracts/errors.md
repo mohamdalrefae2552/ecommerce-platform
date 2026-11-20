@@ -52,6 +52,7 @@ Code-specific extensions: `errors` (422 `VALIDATION_FAILED`),
 | 500 | `INTERNAL_ERROR` | `internal-error` | Anything unexpected | — |
 | 503 | `INVENTORY_UNAVAILABLE` | `inventory-unavailable` | Inventory down (gRPC `UNAVAILABLE`/`ABORTED`/`RESOURCE_EXHAUSTED`) | `Retry-After: 5`, `retry_after` |
 | 503 | `INVENTORY_TIMEOUT` | `inventory-timeout` | Inventory deadline exceeded | `Retry-After: 5`, `retry_after` |
+| 503 | `SERVICE_UNAVAILABLE` | `service-unavailable` | Maintenance mode (`php artisan down`), shared by every api replica | `Retry-After` (when given), `retry_after` |
 
 Where the requirement-2 codes appear: `POST /orders` (409 `INSUFFICIENT_STOCK`,
 503 `INVENTORY_UNAVAILABLE` / `INVENTORY_TIMEOUT`) and

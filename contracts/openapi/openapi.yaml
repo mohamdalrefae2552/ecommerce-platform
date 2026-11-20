@@ -2279,6 +2279,7 @@ components:
         - INTERNAL_ERROR
         - INVENTORY_UNAVAILABLE
         - INVENTORY_TIMEOUT
+        - SERVICE_UNAVAILABLE
       example: NOT_FOUND
     Problem:
       type: object
