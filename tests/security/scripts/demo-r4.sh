@@ -73,7 +73,12 @@ cancel_orders() {
 # start <service...>: start stopped containers and wait until they are
 # healthy. `start`, not `up`: the containers keep the configuration `make up`
 # gave them (published ports included).
-is_healthy() { [[ "$(docker inspect -f '{{.State.Health.Status}}' "${PROJECT}-$1-1" 2>/dev/null)" == healthy ]]; }
+# is_healthy <service>: every container of the service (it may have replicas) is healthy.
+is_healthy() {
+  local states
+  states="$(compose ps -a --format '{{.Health}}' "$1" 2>/dev/null | tr -d '\r')"
+  [[ -n "$states" ]] && ! grep -qv '^healthy$' <<<"$states"
+}
 start() {
   local service
   compose start "$@" >/dev/null 2>&1
@@ -175,7 +180,7 @@ routed="$(curl -sS --max-time "$CURL_MAX_TIME" -u "$RABBITMQ_USER:$RABBITMQ_PASS
 expect_eq "RabbitMQ routed the poison message to the queues" true "$routed"
 wait_until 20 depth_is "$MAIL_QUEUE.dlq" "$((dlq_before + 1))" || true
 expect_eq "it is parked in $MAIL_QUEUE.dlq (not retried, not lost)" "$((dlq_before + 1))" "$(queue_depth "$MAIL_QUEUE.dlq")"
-expect_eq "the worker is still running" running "$(compose ps --format '{{.State}}' worker-mail | tr -d '\r')"
+expect_eq "the workers are still running" running "$(compose ps --format '{{.State}}' worker-mail | tr -d '\r' | sort -u)"
 if [[ "$dlq_before" == 0 ]]; then
   compose exec -T rabbitmq rabbitmqctl -q purge_queue "$MAIL_QUEUE.dlq" >/dev/null 2>&1 || true
   compose exec -T rabbitmq rabbitmqctl -q purge_queue "$LIVE_QUEUE.dlq" >/dev/null 2>&1 || true
