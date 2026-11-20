@@ -37,6 +37,11 @@ x-api-env: &api-env
   # Not CACHE_STORE from .env on purpose: older .env files still say
   # "database". API_CACHE_STORE=database only for the perf-compare baseline.
   CACHE_STORE: ${API_CACHE_STORE:-redis}
+  # Requirement 5: `php artisan down` must stop EVERY replica, not just the
+  # one it ran in. The default driver writes storage/framework/down inside
+  # that container only; the cache driver keeps the flag in Redis.
+  APP_MAINTENANCE_DRIVER: ${APP_MAINTENANCE_DRIVER:-cache}
+  APP_MAINTENANCE_STORE: redis
   REDIS_HOST: redis
   REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (make bootstrap adds it)}
   CATALOG_CACHE_TTL: ${CATALOG_CACHE_TTL:-600}
@@ -123,10 +128,16 @@ services:
       retries: 10
     networks: [app-net]
 
+  # Requirement 5: several identical replicas behind edge (least_conn,
+  # ADR-0017). The api keeps no state of its own: tokens are JWT, sessions
+  # do not exist, cache / rate limits / read-your-writes live in Redis,
+  # product images and JWT keys on shared volumes.
   api:
     build:
       context: backend/api
       target: runtime
+    deploy:
+      replicas: ${API_REPLICAS:-3}
     restart: unless-stopped
     environment: *api-env
     volumes:
@@ -185,6 +196,11 @@ services:
     build:
       context: backend/api
       target: runtime
+    # Requirement 5: competing consumers on notifications.mail. RabbitMQ
+    # hands each message to exactly one of them (prefetch 1), and the
+    # handler is idempotent on the message id.
+    deploy:
+      replicas: ${MAIL_WORKERS:-3}
     restart: unless-stopped
     command: ["php", "artisan", "messaging:consume", "notifications.mail"]
     stop_grace_period: 20s
@@ -239,12 +255,18 @@ services:
     build:
       context: backend/api
       target: runtime
+    # Requirement 5: no single WebSocket server. Instances share events
+    # through Redis (REVERB_SCALING_ENABLED), so it does not matter which one
+    # a browser or worker-realtime reaches.
+    deploy:
+      replicas: ${REVERB_REPLICAS:-2}
     restart: unless-stopped
     command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
     environment:
       <<: *api-env
       # Only pages served from this host may open a socket.
       REVERB_ALLOWED_ORIGINS: ${REVERB_ALLOWED_ORIGINS:-localhost}
+      REVERB_SCALING_ENABLED: ${REVERB_SCALING_ENABLED:-true}
     depends_on:
       redis:
         condition: service_healthy
@@ -467,6 +489,8 @@ services:
       <<: *api-env
       APP_ENV: testing
       CACHE_STORE: array
+      # The test container has no Redis: the maintenance flag stays a file there.
+      APP_MAINTENANCE_DRIVER: file
       DB_HOST: db-app-test
       DB_READ_HOST: db-app-test
       DB_DATABASE: ${DB_TEST_DATABASE:-app_test}

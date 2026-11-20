@@ -129,7 +129,7 @@ verify-e2e: ## Playwright E2E against the running stack (run `make up` first)
 	$(TESTS) run --rm e2e
 
 # ---------------------------------------------------------------- proofs --
-.PHONY: race-test perf-seed perf-test perf-compare replica-check postman demo-r1 demo-r2 demo-r4 demo-r5 scale
+.PHONY: race-test perf-seed perf-test perf-compare replica-check postman demo-r1 demo-r2 demo-r4 demo-r5 scale scale-load scale-problems
 race-test: ## PROOF-R2-1: N concurrent orders on the last unit: make race-test [N=50]
 	$(need_docker)
 	$(TOOLS) run --rm -e N=$(or $(N),50) k6 run --quiet /work/tests/load/race.js
@@ -176,9 +176,18 @@ demo-r5: ## Scaling groundwork (provisional): 3 api replicas, one stopped under 
 	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" \
 	  bash tests/security/scripts/demo-r5.sh
 
-scale: ## Run several replicas: make scale API=3 [MAIL_WORKERS=2]; back to one: make scale
+scale-problems: ## PROOF-R5-3: each hidden multi-replica problem shown before and after its fix (~4 min)
 	$(need_docker)
-	$(COMPOSE) up -d --no-recreate --wait --scale api=$(or $(API),1) --scale worker-mail=$(or $(MAIL_WORKERS),1)
+	@$(DEMO_ENV) EDGE_URL="http://localhost:$(EDGE_PORT)" PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" \
+	  REVERB_APP_KEY="$(call env_value,REVERB_APP_KEY)" bash tests/security/scripts/scale-problems.sh
+
+scale-load: ## PROOF-R5: 500 requests over the api replicas, who answered each: make scale-load [STOP=2] [REQUESTS=500]
+	$(need_docker)
+	@PROJECT="$(PROJECT)" COMPOSE="$(COMPOSE)" REQUESTS="$(REQUESTS)" STOP="$(STOP)" bash $(SCRIPTS)/scale-load.sh
+
+scale: ## Change replicas live: make scale API=3 MAIL_WORKERS=3 (defaults: API_REPLICAS / MAIL_WORKERS in .env)
+	$(need_docker)
+	$(COMPOSE) up -d --no-recreate --wait --scale api=$(or $(API),$(call env_value,API_REPLICAS),3) --scale worker-mail=$(or $(MAIL_WORKERS),$(call env_value,MAIL_WORKERS),3)
 
 # ----------------------------------------------------------------- chaos --
 # Toxiproxy sits between api/scheduler and inventory (docs/01 section 1).
