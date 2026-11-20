@@ -28,6 +28,7 @@ export const problemMessages = {
   INTERNAL_ERROR: 'حدث خطأ غير متوقع في الخادم. حاول لاحقاً.',
   INVENTORY_UNAVAILABLE: 'خدمة المخزون غير متاحة حالياً.',
   INVENTORY_TIMEOUT: 'خدمة المخزون لم تستجب في الوقت المحدد.',
+  SERVICE_UNAVAILABLE: 'المتجر في صيانة مؤقتة.',
 } as const satisfies Record<ProblemCode, string>;
 
 /** Shown when a response is not a valid problem (HTML from a proxy, broken JSON, unknown code). */
@@ -162,6 +163,7 @@ const RETRYABLE_CODES: ReadonlySet<ProblemCode> = new Set([
   'RATE_LIMITED',
   'INVENTORY_UNAVAILABLE',
   'INVENTORY_TIMEOUT',
+  'SERVICE_UNAVAILABLE',
 ]);
 
 /** Arabic message for anything a query or mutation may throw. */
